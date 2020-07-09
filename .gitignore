@@ -1,0 +1,6 @@
+.*.swp
+*.vimrc
+Terraform/.terraform
+Terraform/ocp-ssh*
+*.tfstate
+*.tfstate.backup
