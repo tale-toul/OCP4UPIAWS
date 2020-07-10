@@ -5,17 +5,17 @@ provider "aws" {
   shared_credentials_file = "aws-credentials.ini"
 }
 
-##This is only used to generate random values
-#provider "random" {
-#  version = "~> 2.3.0"
-#}
+#This is only used to generate random values
+provider "random" {
+  version = "~> 2.3.0"
+}
 
-##Provides a source to create a short random string 
-#resource "random_string" "sufix_name" {
-#  length = 5
-#  upper = false
-#  special = false
-#}
+#Provides a source to create a short random string 
+resource "random_string" "sufix_name" {
+  length = 5
+  upper = false
+  special = false
+}
 
 #VPC
 resource "aws_vpc" "vpc" {
@@ -60,6 +60,7 @@ resource "aws_subnet" "subnet_pub" {
     tags = {
         Name = "subnet_pub.${count.index}"
         Clusterid = var.cluster_name
+        "kubernetes.io/cluster/${var.cluster_name}-${local.ran_string_tag}" = "shared"
     }
 }
 
@@ -75,6 +76,7 @@ resource "aws_subnet" "subnet_priv" {
   tags = {
       Name = "subnet_priv.${count.index}"
       Clusterid = var.cluster_name
+      "kubernetes.io/cluster/${var.cluster_name}-${local.ran_string_tag}" = "shared"
   }
 }
 
@@ -215,6 +217,164 @@ resource "aws_route_table_association" "rtabasso_nat_priv" {
     route_table_id = aws_route_table.rtable_priv[count.index].id
 }
 
+#LOAD BALANCERS
+
+#External API loadbalancer
+resource "aws_lb" "ext_api_lb" {
+  name = "nlb-${var.cluster_name}-ext"
+  internal = false
+  load_balancer_type = "network"
+  subnets = aws_subnet.subnet_pub.*.id
+  ip_address_type = "ipv4"
+
+  tags = {
+    Clusterid = var.cluster_name
+  }
+}
+
+#Target group for the external API NLB
+resource "aws_lb_target_group" "external_tg" {
+  name = "tg-external-lb"
+  port = 6443
+  protocol = "TCP"
+  target_type = "ip"
+  vpc_id = aws_vpc.vpc.id
+  deregistration_delay = 60
+}
+
+#Listener for the external API NLB
+resource "aws_lb_listener" "external_listener" {
+  load_balancer_arn = aws_lb.ext_api_lb.arn
+  port = "6443"
+  protocol = "TCP"
+  
+  default_action {
+    type = "forward"
+    target_group_arn = aws_lb_target_group.external_tg.arn
+  }
+}
+
+#Internal API loadbalancer
+resource "aws_lb" "int_api_lb" {
+  name = "nlb-${var.cluster_name}-int"
+  internal = true
+  load_balancer_type = "network"
+  subnets = aws_subnet.subnet_priv.*.id
+  ip_address_type = "ipv4"
+
+  tags = {
+    Clusterid = var.cluster_name
+  }
+}
+
+#Target group for the internal API NLB
+resource "aws_lb_target_group" "internal_tg" {
+  name = "tg-internal-lb"
+  port = 6443
+  protocol = "TCP"
+  target_type = "ip"
+  vpc_id = aws_vpc.vpc.id
+  deregistration_delay = 60
+}
+
+#Listener for the internal API NLB
+resource "aws_lb_listener" "internal_listener" {
+  load_balancer_arn = aws_lb.int_api_lb.arn
+  port = "6443"
+  protocol = "TCP"
+  
+  default_action {
+    type = "forward"
+    target_group_arn = aws_lb_target_group.internal_tg.arn
+  }
+}
+
+#Target group for the internal service API NLB
+resource "aws_lb_target_group" "internal_service_tg" {
+  name = "tg-internal-service-lb"
+  port = 22623
+  protocol = "TCP"
+  target_type = "ip"
+  vpc_id = aws_vpc.vpc.id
+  deregistration_delay = 60
+}
+
+#Listener for the internal service API NLB
+resource "aws_lb_listener" "internal_service_listener" {
+  load_balancer_arn = aws_lb.int_api_lb.arn
+  port = "22623"
+  protocol = "TCP"
+  
+  default_action {
+    type = "forward"
+    target_group_arn = aws_lb_target_group.internal_service_tg.arn
+  }
+}
+
+#IAM
+#At the moment I'm dropping the IAM section about updating target groups and automatic tagging, which should not be required for installation.
+##IAM role to (de)register targets in the NLBs
+#resource "aws_iam_role" "reg-target-lambda-role" {
+#  name = "${var.cluster_name}-nlb-lambda-role"
+#  path = "/"
+#  
+#  assume_role_policy = <<EOF
+#{
+#  "Version": "2012-10-17",
+#  "Statement": [
+#    {
+#      "Effect": "Allow",
+#      "Principal": {
+#        "Service": "lambda.amazonaws.com"
+#      },
+#      "Action": "sts:AssumeRole"
+#    }
+#  ]
+#}
+#EOF
+#  tags = {
+#    Clusterid = var.cluster_name
+#  }
+#}
+#
+##Policies for (de)register target roles
+#resource "aws_iam_role_policy" "reg-target-policy" {
+#  name = "${var.cluster_name}-reg-taget-policy"
+#  role = aws_iam_role.reg-target-lambda-role.id
+#
+#  policy = <<EOF
+#{
+#  "Version": "2012-10-17",
+#  "Statement": [
+#    {
+#      "Effect": "Allow",
+#      "Action": [
+#          "elasticloadbalancing:RegisterTargets",
+#          "elasticloadbalancing:DeregisterTargets"
+#      ],
+#      "Resource": "${aws_lb_target_group.internal_tg.arn}"
+#    },
+#    {
+#      "Effect": "Allow",
+#      "Action": [
+#          "elasticloadbalancing:RegisterTargets",
+#          "elasticloadbalancing:DeregisterTargets"
+#        ],
+#      "Resource":  "${aws_lb_target_group.internal_service_tg.arn}" 
+#    },
+#    {
+#      "Effect": "Allow",
+#      "Action": [
+#          "elasticloadbalancing:RegisterTargets",
+#          "elasticloadbalancing:DeregisterTargets"
+#        ],
+#      "Resource": "${aws_lb_target_group.external_tg.arn}"
+#    }
+#  ]
+#}
+#EOF
+#}
+
 ##SECURITY GROUPS
 #resource "aws_security_group" "sg-ssh-in" {
 #    name = "ssh-in"
@@ -322,46 +482,89 @@ resource "aws_route_table_association" "rtabasso_nat_priv" {
 #  }
 #}
 #
-##ROUTE53 CONFIG
-##Datasource for rhcee.support. route53 zone
-#data "aws_route53_zone" "domain" {
-#  zone_id = var.dns_domain_ID
-#}
-#
+#ROUTE53 CONFIG
+#Datasource for rhcee.support. route53 zone
+data "aws_route53_zone" "domain" {
+  zone_id = var.dns_domain_ID
+}
+
 ##External hosted zone, this is a public zone because it is not associated with a VPC. 
-##It is used to resolve the bastion name 
-#resource "aws_route53_zone" "external" {
-#  name = "${var.domain_name}.${data.aws_route53_zone.domain.name}"
-#
-#  tags = {
-#    Name = "external"
-#    Clusterid = var.cluster_name
-#  }
-#}
-#
-#resource "aws_route53_record" "external-ns" {
-#  zone_id = data.aws_route53_zone.domain.zone_id
-#  name    = "${var.domain_name}.${data.aws_route53_zone.domain.name}"
-#  type    = "NS"
-#  ttl     = "30"
-#
-#  records = [
-#    "${aws_route53_zone.external.name_servers.0}",
-#    "${aws_route53_zone.external.name_servers.1}",
-#    "${aws_route53_zone.external.name_servers.2}",
-#    "${aws_route53_zone.external.name_servers.3}",
-#  ]
-#}
-#
-#resource "aws_route53_record" "bastion" {
-#    zone_id = aws_route53_zone.external.zone_id
-#    name = "bastion"
-#    type = "A"
-#    ttl = "300"
-#    records =[aws_eip.bastion_eip.public_ip]
-#}
+resource "aws_route53_zone" "external" {
+  name = "${var.domain_name}.${data.aws_route53_zone.domain.name}"
 
+  tags = {
+    Name = "external"
+    Clusterid = var.cluster_name
+  }
+}
 
+resource "aws_route53_record" "external-ns" {
+  zone_id = data.aws_route53_zone.domain.zone_id
+  name    = "${var.domain_name}.${data.aws_route53_zone.domain.name}"
+  type    = "NS"
+  ttl     = "30"
+
+  records = [
+    "${aws_route53_zone.external.name_servers.0}",
+    "${aws_route53_zone.external.name_servers.1}",
+    "${aws_route53_zone.external.name_servers.2}",
+    "${aws_route53_zone.external.name_servers.3}",
+  ]
+}
+
+#External API DNS record
+resource "aws_route53_record" "api-external" {
+    zone_id = aws_route53_zone.external.zone_id
+    name = "api.${var.cluster_name}"
+    type = "A"
+
+    alias {
+      name = aws_lb.ext_api_lb.dns_name
+      zone_id = aws_lb.ext_api_lb.zone_id
+      evaluate_target_health = false
+    }
+}
+
+#Internal hosted zone, this is private because it is associated with a VPC.
+resource "aws_route53_zone" "internal" {
+  name = "${var.cluster_name}.${var.domain_name}.${data.aws_route53_zone.domain.name}"
+
+  vpc {
+    vpc_id = aws_vpc.vpc.id
+  }
+
+  tags = {
+    Name = "internal"
+    Clusterid = var.cluster_name
+    "kubernetes.io/cluster/${var.cluster_name}" = "owned"
+  }
+}
+
+#Internal API DNS record, for external name
+resource "aws_route53_record" "api-internal-external" {
+    zone_id = aws_route53_zone.internal.zone_id
+    name = "api"
+    type = "A"
+
+    alias {
+      name = aws_lb.int_api_lb.dns_name
+      zone_id = aws_lb.int_api_lb.zone_id
+      evaluate_target_health = false
+    }
+}
+
+#Internal API DNS record, for internal name
+resource "aws_route53_record" "api-internal-internal" {
+    zone_id = aws_route53_zone.internal.zone_id
+    name = "api-int"
+    type = "A"
+
+    alias {
+      name = aws_lb.int_api_lb.dns_name
+      zone_id = aws_lb.int_api_lb.zone_id
+      evaluate_target_health = false
+    }
+}
 ##OUTPUT
 #output "bastion_public_ip" {  
 # value       = aws_instance.tale_bastion.public_ip  

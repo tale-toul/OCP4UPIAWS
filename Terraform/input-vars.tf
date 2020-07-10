@@ -86,4 +86,7 @@ private_subnet_count = var.subnet_count > 0 && var.subnet_count <= 3 ? var.subne
 
 #If the proxy is enable, only 1 public subnet is created for the bastion, otherwise the same number as for the private subnets
 public_subnet_count = var.enable_proxy ? 1 : local.private_subnet_count
+
+#Random constant string to add to the kubernetio.io/cluster tags
+ran_string_tag = random_string.sufix_name.result
 }
