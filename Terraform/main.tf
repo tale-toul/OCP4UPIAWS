@@ -375,25 +375,257 @@ resource "aws_lb_listener" "internal_service_listener" {
 #EOF
 #}
 
-##SECURITY GROUPS
-#resource "aws_security_group" "sg-ssh-in" {
-#    name = "ssh-in"
-#    description = "Allow ssh connections"
-#    vpc_id = aws_vpc.vpc.id
-#
-#  ingress {
-#    from_port = 22
-#    to_port = 22
-#    protocol = "tcp"
-#    cidr_blocks = ["0.0.0.0/0"]
-#    }
-#
-#    tags = {
-#        Name = "sg-ssh"
-#        Clusterid = var.cluster_name
-#    }
-#}
-#
+#SECURITY GROUPS
+#Master security group
+resource "aws_security_group" "master-sg" {
+    name = "master-sg"
+    description = "Security group for master nodes"
+    vpc_id = aws_vpc.vpc.id
+
+    tags = {
+        Clusterid = var.cluster_name
+    }
+}
+
+resource "aws_security_group_rule" "icmp-master" {
+  type = "ingress"
+  from_port = 0
+  to_port = 0
+  protocol = "icmp"
+  cidr_blocks = [var.vpc_cidr]
+  security_group_id = aws_security_group.master-sg.id
+}
+
+resource "aws_security_group_rule" "ssh-master" {
+  type = "ingress" 
+  description = "ssh"
+  from_port = 22
+  to_port = 22
+  protocol = "tcp"
+  cidr_blocks = [var.vpc_cidr]
+  security_group_id = aws_security_group.master-sg.id
+}
+
+resource "aws_security_group_rule" "api-master" {
+  type = "ingress" 
+  description = "api"
+  from_port = 6443
+  to_port = 6443
+  protocol = "tcp"
+  cidr_blocks = [var.vpc_cidr]
+  security_group_id = aws_security_group.master-sg.id
+}
+
+resource "aws_security_group_rule" "ignition-master" {
+  type = "ingress"
+  description = "ignition config"
+  from_port = 22623
+  to_port = 22623
+  protocol = "tcp"
+  cidr_blocks = [var.vpc_cidr]
+  security_group_id = aws_security_group.master-sg.id
+}
+
+resource "aws_security_group_rule" "etcd-master" {
+  type = "ingress"
+  description = "etcd"
+  from_port = 2379
+  to_port = 2380
+  protocol = "tcp"
+  security_group_id = aws_security_group.master-sg.id
+  self = true
+}
+
+resource "aws_security_group_rule" "vxlan-master" {
+  type = "ingress"
+  description = "Vxlan packets"
+  from_port = 4789
+  to_port = 4789
+  protocol = "udp"
+  security_group_id = aws_security_group.master-sg.id
+  source_security_group_id = aws_security_group.worker-sg.id
+}
+
+resource "aws_security_group_rule" "vxlan-master-self" {
+  type = "ingress"
+  description = "Vxlan packets"
+  from_port = 4789
+  to_port = 4789
+  protocol = "udp"
+  security_group_id = aws_security_group.master-sg.id
+  self = true
+}
+
+resource "aws_security_group_rule" "internal-master" {
+  type = "ingress"
+  description = "Internal cluster communication"
+  from_port = 9000
+  to_port = 9999
+  protocol = "tcp"
+  security_group_id = aws_security_group.master-sg.id
+  source_security_group_id = aws_security_group.worker-sg.id
+}
+
+resource "aws_security_group_rule" "internal-master-self" {
+  type = "ingress"
+  description = "Internal cluster communication"
+  from_port = 9000
+  to_port = 9999
+  protocol = "tcp"
+  security_group_id = aws_security_group.master-sg.id
+  self = true
+}
+
+resource "aws_security_group_rule" "kubelet-master" {
+  type = "ingress"
+  description = "Kubernetes kubelet, scheduler and controller manager"
+  from_port = 10250
+  to_port = 10259
+  protocol = "tcp"
+  security_group_id = aws_security_group.master-sg.id
+  source_security_group_id = aws_security_group.worker-sg.id
+}
+
+resource "aws_security_group_rule" "kubelet-master-self" {
+  type = "ingress"
+  description = "Kubernetes kubelet, scheduler and controller manager"
+  from_port = 10250
+  to_port = 10259
+  protocol = "tcp"
+  security_group_id = aws_security_group.master-sg.id
+  self = true
+}
+
+resource "aws_security_group_rule" "services-master" {
+  type = "ingress"
+  description = "Kubernetes ingress services"
+  from_port = 30000
+  to_port = 32767
+  protocol = "tcp"
+  security_group_id = aws_security_group.master-sg.id
+  source_security_group_id = aws_security_group.worker-sg.id
+}
+
+resource "aws_security_group_rule" "services-master-self" {
+  type = "ingress"
+  description = "Kubernetes ingress services"
+  from_port = 30000
+  to_port = 32767
+  protocol = "tcp"
+  security_group_id = aws_security_group.master-sg.id
+  self = true
+}
+
+#Worker security group
+resource "aws_security_group" "worker-sg" {
+    name = "worker-sg"
+    description = "Security group for worker nodes"
+    vpc_id = aws_vpc.vpc.id
+
+    tags = {
+        Clusterid = var.cluster_name
+    }
+}
+
+resource "aws_security_group_rule" "icmp-worker" {
+  type = "ingress"
+  from_port = 0
+  to_port = 0
+  protocol = "icmp"
+  cidr_blocks = [var.vpc_cidr]
+  security_group_id = aws_security_group.worker-sg.id
+}
+
+resource "aws_security_group_rule" "ssh-worker" {
+  type = "ingress" 
+  description = "ssh"
+  from_port = 22
+  to_port = 22
+  protocol = "tcp"
+  cidr_blocks = [var.vpc_cidr]
+  security_group_id = aws_security_group.worker-sg.id
+}
+
+resource "aws_security_group_rule" "vxlan-worker" {
+  type = "ingress"
+  description = "Vxlan packets"
+  from_port = 4789
+  to_port = 4789
+  protocol = "udp"
+  security_group_id = aws_security_group.worker-sg.id
+  source_security_group_id = aws_security_group.master-sg.id
+}
+
+resource "aws_security_group_rule" "vxlan-worker-self" {
+  type = "ingress"
+  description = "Vxlan packets"
+  from_port = 4789
+  to_port = 4789
+  protocol = "udp"
+  security_group_id = aws_security_group.worker-sg.id
+  self = true
+}
+
+resource "aws_security_group_rule" "internal-worker" {
+  type = "ingress"
+  description = "Internal cluster communication"
+  from_port = 9000
+  to_port = 9999
+  protocol = "tcp"
+  security_group_id = aws_security_group.worker-sg.id
+  source_security_group_id = aws_security_group.master-sg.id
+}
+
+resource "aws_security_group_rule" "internal-worker-self" {
+  type = "ingress"
+  description = "Internal cluster communication"
+  from_port = 9000
+  to_port = 9999
+  protocol = "tcp"
+  security_group_id = aws_security_group.worker-sg.id
+  self = true
+}
+
+resource "aws_security_group_rule" "kubelet-worker" {
+  type = "ingress"
+  description = "Kubernetes secure kubelet port"
+  from_port = 10250
+  to_port = 10250
+  protocol = "tcp"
+  security_group_id = aws_security_group.worker-sg.id
+  source_security_group_id = aws_security_group.master-sg.id
+}
+
+resource "aws_security_group_rule" "kubelet-worker-self" {
+  type = "ingress"
+  description = "Kubernetes secure kubelet port"
+  from_port = 10250
+  to_port = 10250
+  protocol = "tcp"
+  security_group_id = aws_security_group.worker-sg.id
+  self = true
+}
+
+resource "aws_security_group_rule" "services-worker" {
+  type = "ingress"
+  description = "Kubernetes ingress services"
+  from_port = 30000
+  to_port = 32767
+  protocol = "tcp"
+  security_group_id = aws_security_group.worker-sg.id
+  source_security_group_id = aws_security_group.master-sg.id
+}
+
+resource "aws_security_group_rule" "services-worker-self" {
+  type = "ingress"
+  description = "Kubernetes ingress services"
+  from_port = 30000
+  to_port = 32767
+  protocol = "tcp"
+  security_group_id = aws_security_group.worker-sg.id
+  self = true
+}
+
 #resource "aws_security_group" "sg-squid" {
 #    count = var.enable_proxy ? 1 : 0
 #    name = "squid"
@@ -566,22 +798,10 @@ resource "aws_route53_record" "api-internal-internal" {
     }
 }
 ##OUTPUT
-#output "bastion_public_ip" {  
-# value       = aws_instance.tale_bastion.public_ip  
-# description = "The public IP address of bastion host"
-#}
-#output "bastion_private_ip" {
-#  value     = aws_instance.tale_bastion.private_ip
-#  description = "The private IP address of the bastion host"
-#}
-#output "base_dns_domain" {
-#  value     = aws_route53_zone.external.name
-#  description = "Base DNS domain for the OCP cluster"
-#}
-#output "bastion_dns_name" {
-#  value = aws_route53_record.bastion.fqdn
-#  description = "DNS name for bastion host"
-#}
+output "api_extenal_name" {
+  value     = aws_route53_record.api-external.fqdn
+  description = "DNS name for the API entry point"
+}
 output "cluster_name" {
  value = var.cluster_name
  description = "Cluser name, used for prefixing some component names like the DNS domain"
