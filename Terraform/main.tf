@@ -312,73 +312,204 @@ resource "aws_lb_listener" "internal_service_listener" {
 }
 
 #IAM
-#At the moment I'm dropping the IAM section about updating target groups and automatic tagging, which should not be required for installation.
-##IAM role to (de)register targets in the NLBs
-#resource "aws_iam_role" "reg-target-lambda-role" {
-#  name = "${var.cluster_name}-nlb-lambda-role"
-#  path = "/"
-#  
-#  assume_role_policy = <<EOF
-#{
-#  "Version": "2012-10-17",
-#  "Statement": [
-#    {
-#      "Effect": "Allow",
-#      "Principal": {
-#        "Service": "lambda.amazonaws.com"
-#      },
-#      "Action": "sts:AssumeRole"
-#    }
-#  ]
-#}
-#EOF
-#  tags = {
-#    Clusterid = var.cluster_name
-#  }
-#}
-#
-##Policies for (de)register target roles
-#resource "aws_iam_role_policy" "reg-target-policy" {
-#  name = "${var.cluster_name}-reg-taget-policy"
-#  role = aws_iam_role.reg-target-lambda-role.id
-#
-#  policy = <<EOF
-#{
-#  "Version": "2012-10-17",
-#  "Statement": [
-#    {
-#      "Effect": "Allow",
-#      "Action": [
-#          "elasticloadbalancing:RegisterTargets",
-#          "elasticloadbalancing:DeregisterTargets"
-#      ],
-#      "Resource": "${aws_lb_target_group.internal_tg.arn}"
-#    },
-#    {
-#      "Effect": "Allow",
-#      "Action": [
-#          "elasticloadbalancing:RegisterTargets",
-#          "elasticloadbalancing:DeregisterTargets"
-#        ],
-#      "Resource":  "${aws_lb_target_group.internal_service_tg.arn}" 
-#    },
-#    {
-#      "Effect": "Allow",
-#      "Action": [
-#          "elasticloadbalancing:RegisterTargets",
-#          "elasticloadbalancing:DeregisterTargets"
-#        ],
-#      "Resource": "${aws_lb_target_group.external_tg.arn}"
-#    }
-#  ]
-#}
-#EOF
-#}
+#IAM role for master EC2 instances
+resource "aws_iam_role" "master-role" {
+  name = "${var.cluster_name}-master-role"
+
+  assume_role_policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "ec2.amazonaws.com"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+EOF
+  tags = {
+    Clusterid = var.cluster_name
+  }
+}
+
+#Policies for the master role
+resource "aws_iam_role_policy" "master-policy" {
+  name = "${var.cluster_name}-master-policy"
+  role = aws_iam_role.master-role.id
+
+  policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+          "ec2:*"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+          "elasticloadbalancing:*"
+        ],
+      "Resource":  "*" 
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+          "iam:PassRole"
+        ],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+          "s3:GetObject"
+        ],
+      "Resource": "*"
+    }
+  ]
+}
+EOF
+}
+
+#Instance profile for the master role
+resource "aws_iam_instance_profile" "master-profile" {
+  name = "${var.cluster_name}-master-profile"
+  role = aws_iam_role.master-role.name
+}
+
+#IAM role for worker EC2 instances
+resource "aws_iam_role" "worker-role" {
+  name = "${var.cluster_name}-worker-role"
+
+  assume_role_policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "ec2.amazonaws.com"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+EOF
+  tags = {
+    Clusterid = var.cluster_name
+  }
+}
+
+#Policies for the worker role
+resource "aws_iam_role_policy" "worker-policy" {
+  name = "${var.cluster_name}-worker-policy"
+  role = aws_iam_role.worker-role.id
+
+  policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+          "ec2:Describe*"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+EOF
+}
+
+#Instance profile for the worker role
+resource "aws_iam_instance_profile" "worker-profile" {
+  name = "${var.cluster_name}-worker-profile"
+  role = aws_iam_role.worker-role.name
+}
+
+#IAM role for bootstrap EC2 instance
+resource "aws_iam_role" "bootstrap-role" {
+  name = "${var.cluster_name}-bootstrap-role"
+  path = "/"
+
+  assume_role_policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "ec2.amazonaws.com"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+EOF
+  tags = {
+    Clusterid = var.cluster_name
+  }
+}
+
+#Policies for the bootstrap role
+resource "aws_iam_role_policy" "bootstrap-policy" {
+  name = "${var.cluster_name}-bootstrap-policy"
+  role = aws_iam_role.bootstrap-role.id
+
+  policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+          "ec2:Describe*"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+          "ec2:AttachVolume"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+          "ec2:DetachVolume"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+          "s3:GetObject"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+EOF
+}
+
+#Instance profile for the bootstrap role
+resource "aws_iam_instance_profile" "bootstrap-profile" {
+  name = "${var.cluster_name}-bootstrap-profile"
+  role = aws_iam_role.bootstrap-role.name
+  path = "/"
+}
 
 #SECURITY GROUPS
 #Master security group
 resource "aws_security_group" "master-sg" {
-    name = "master-sg"
+    name = "${var.cluster_name}-master-sg"
     description = "Security group for master nodes"
     vpc_id = aws_vpc.vpc.id
 
@@ -518,7 +649,7 @@ resource "aws_security_group_rule" "services-master-self" {
 
 #Worker security group
 resource "aws_security_group" "worker-sg" {
-    name = "worker-sg"
+    name = "${var.cluster_name}-worker-sg"
     description = "Security group for worker nodes"
     vpc_id = aws_vpc.vpc.id
 
@@ -624,6 +755,61 @@ resource "aws_security_group_rule" "services-worker-self" {
   protocol = "tcp"
   security_group_id = aws_security_group.worker-sg.id
   self = true
+}
+
+#Bootstrap security group
+resource "aws_security_group" "bootstrap-sg" {
+    name = "${var.cluster_name}-bootstrap-sg"
+    description = "Security group for bootstrap node"
+    vpc_id = aws_vpc.vpc.id
+
+    ingress {
+        from_port = 22
+        to_port = 22
+        protocol = "tcp"
+        cidr_blocks = ["0.0.0.0/0"]
+    }
+
+    ingress {
+        from_port = 19531
+        to_port = 19531
+        protocol = "tcp"
+        cidr_blocks = ["0.0.0.0/0"]
+    }
+
+    tags = {
+        Clusterid = var.cluster_name
+    }
+}
+
+resource "aws_security_group_rule" "outbound-all-master-sgr" {
+  type = "egress"
+  description = "Allow all outbound connections from master EC2s"
+  from_port = 0
+  to_port = 0
+  protocol = "-1"
+  cidr_blocks = ["0.0.0.0/0"]
+  security_group_id = aws_security_group.master-sg.id
+}
+
+resource "aws_security_group_rule" "outbound-all-worker-sgr" {
+  type = "egress"
+  description = "Allow all outbound connections from workers EC2s"
+  from_port = 0
+  to_port = 0
+  protocol = "-1"
+  cidr_blocks = ["0.0.0.0/0"]
+  security_group_id = aws_security_group.worker-sg.id
+}
+
+resource "aws_security_group_rule" "outbound-all-bootstrap-sgr" {
+  type = "egress"
+  description = "Allow all outbound connections from bootstrap EC2s"
+  from_port = 0
+  to_port = 0
+  protocol = "-1"
+  cidr_blocks = ["0.0.0.0/0"]
+  security_group_id = aws_security_group.bootstrap-sg.id
 }
 
 #resource "aws_security_group" "sg-squid" {
