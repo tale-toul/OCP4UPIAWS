@@ -233,6 +233,7 @@ resource "aws_lb" "ext_api_lb" {
 }
 
 #Target group for the external API NLB
+#Attachment to the target groups is defined next to the EC2 instances definition
 resource "aws_lb_target_group" "external_tg" {
   name = "tg-external-lb"
   port = 6443
@@ -240,6 +241,10 @@ resource "aws_lb_target_group" "external_tg" {
   target_type = "ip"
   vpc_id = aws_vpc.vpc.id
   deregistration_delay = 60
+
+  tags = {
+    Clusterid = var.cluster_name
+  }
 }
 
 #Listener for the external API NLB
@@ -275,6 +280,10 @@ resource "aws_lb_target_group" "internal_tg" {
   target_type = "ip"
   vpc_id = aws_vpc.vpc.id
   deregistration_delay = 60
+
+  tags = {
+    Clusterid = var.cluster_name
+  }
 }
 
 #Listener for the internal API NLB
@@ -297,6 +306,10 @@ resource "aws_lb_target_group" "internal_service_tg" {
   target_type = "ip"
   vpc_id = aws_vpc.vpc.id
   deregistration_delay = 60
+
+  tags = {
+    Clusterid = var.cluster_name
+  }
 }
 
 #Listener for the internal service API NLB
@@ -812,68 +825,6 @@ resource "aws_security_group_rule" "outbound-all-bootstrap-sgr" {
   security_group_id = aws_security_group.bootstrap-sg.id
 }
 
-#resource "aws_security_group" "sg-squid" {
-#    count = var.enable_proxy ? 1 : 0
-#    name = "squid"
-#    description = "Allow squid proxy access"
-#    vpc_id = aws_vpc.vpc.id
-#
-#  ingress {
-#    from_port = 3128
-#    to_port = 3128
-#    protocol = "tcp"
-#    cidr_blocks = [var.vpc_cidr]
-#    }
-#
-#    tags = {
-#        Name = "sg-ssh"
-#        Clusterid = var.cluster_name
-#    }
-#}
-#
-#resource "aws_security_group" "sg-web-in" {
-#    name = "web-in"
-#    description = "Allow http and https inbound connections from anywhere"
-#    vpc_id = aws_vpc.vpc.id
-#
-#    ingress {
-#        from_port = 80
-#        to_port = 80
-#        protocol = "tcp"
-#        cidr_blocks = [var.vpc_cidr]
-#    }
-#
-#    ingress {
-#        from_port = 443
-#        to_port = 443
-#        protocol = "tcp"
-#        cidr_blocks = [var.vpc_cidr]
-#    }
-#
-#    tags = {
-#        Name = "sg-web-in"
-#        Clusterid = var.cluster_name
-#    }
-#}
-#resource "aws_security_group" "sg-all-out" {
-#    name = "all-out"
-#    description = "Allow all outgoing traffic"
-#    vpc_id = aws_vpc.vpc.id
-#
-#  egress {
-#    from_port = 0
-#    to_port = 0
-#    protocol = "-1"
-#    cidr_blocks = ["0.0.0.0/0"]
-#    }
-#
-#    tags = {
-#        Name = "all-out"
-#        Clusterid = var.cluster_name
-#    }
-#}
-#
-#
 ###EC2s
 ###SSH key
 #resource "aws_key_pair" "ssh-key" {
@@ -881,25 +832,111 @@ resource "aws_security_group_rule" "outbound-all-bootstrap-sgr" {
 #  public_key = file("${path.module}/${var.ssh-keyfile}")
 #}
 #
-##Bastion host
-#resource "aws_instance" "tale_bastion" {
-#  ami = var.rhel7-ami[var.region_name]
-#  instance_type = "m4.large"
-#  subnet_id = aws_subnet.subnet_pub.0.id
-#  vpc_security_group_ids = local.bastion_security_groups
-#  key_name= aws_key_pair.ssh-key.key_name
-#
-#  root_block_device {
-#      volume_size = 25
-#      delete_on_termination = true
-#  }
-#
-#  tags = {
-#        Name = "bastion"
-#        Clusterid = var.cluster_name
-#  }
-#}
-#
+#Bootstrap 
+resource "aws_instance" "bootstrap-ec2" {
+  ami = var.rhcos-ami[var.region_name]
+  iam_instance_profile = aws_iam_instance_profile.bootstrap-profile.name
+  instance_type = "m5.large"
+  
+  network_interface {
+    device_index = 0
+    network_interface_id = aws_network_interface.bootstrap-nic.id
+  }
+
+  tags = {
+        Name = "boostrap-${var.cluster_name}"
+        Clusterid = var.cluster_name
+        "kubernetes.io/cluster/${var.cluster_name}-${local.ran_string_tag}" = "shared"
+  }
+}
+
+#Network interface for bootstrap instance
+resource "aws_network_interface" "bootstrap-nic" {
+  security_groups = [aws_security_group.master-sg.id, aws_security_group.bootstrap-sg.id]
+  #Linkded to the subnet 0 for no particular reason
+  subnet_id = aws_subnet.subnet_pub[0].id 
+
+  tags = {
+        Clusterid = var.cluster_name
+  }
+}
+
+#Attachment to the external API target group for bootstrap instance
+resource "aws_lb_target_group_attachment" "bootstrap-external-api-attach" {
+  target_group_arn = aws_lb_target_group.external_tg.arn
+  target_id = aws_instance.bootstrap-ec2.private_ip
+}
+
+#Attachment to the internal API target group for bootstrap instance
+resource "aws_lb_target_group_attachment" "bootstrap-internal-api-attach" {
+  target_group_arn = aws_lb_target_group.internal_tg.arn
+  target_id = aws_instance.bootstrap-ec2.private_ip
+}
+
+#Attachment to the internal service target group for bootstrap instance
+resource "aws_lb_target_group_attachment" "bootstrap-external-service-attach" {
+  target_group_arn = aws_lb_target_group.internal_service_tg.arn
+  target_id = aws_instance.bootstrap-ec2.private_ip
+}
+
+#Masters EC2 instances
+resource "aws_instance" "master-ec2" {
+  count = local.private_subnet_count
+  ami = var.rhcos-ami[var.region_name]
+  iam_instance_profile = aws_iam_instance_profile.master-profile.name
+  instance_type = "m5.xlarge"
+
+  root_block_device {
+      volume_size = 120
+      volume_type = "gp2"
+      delete_on_termination = true
+  }
+
+  network_interface {
+    device_index = 0
+    network_interface_id = aws_network_interface.master-nic[count.index].id
+  }
+
+  tags = {
+        Name = "master-${var.cluster_name}.${count.index}"
+        Clusterid = var.cluster_name
+        "kubernetes.io/cluster/${var.cluster_name}-${local.ran_string_tag}" = "shared"
+  }
+}
+
+#Network interface for the master EC2 instances
+resource "aws_network_interface" "master-nic" {
+  count = local.private_subnet_count
+  security_groups = [aws_security_group.master-sg.id]
+  subnet_id = aws_subnet.subnet_priv[count.index].id
+
+  tags = {
+        Clusterid = var.cluster_name
+  }
+}
+
+#Attachment to the external API target group for master instances
+resource "aws_lb_target_group_attachment" "master-external-api-attach" {
+  count = local.private_subnet_count
+  target_group_arn = aws_lb_target_group.external_tg.arn
+  target_id = aws_instance.master-ec2[count.index].private_ip
+}
+
+#Attachment to the internal API target group for master instances
+resource "aws_lb_target_group_attachment" "master-internal-api-attach" {
+  count = local.private_subnet_count
+  target_group_arn = aws_lb_target_group.internal_tg.arn
+  target_id = aws_instance.master-ec2[count.index].private_ip
+}
+
+#Attachment to the internal service target group for master instances
+resource "aws_lb_target_group_attachment" "master-external-service-attach" {
+  count = local.private_subnet_count
+  target_group_arn = aws_lb_target_group.internal_service_tg.arn
+  target_id = aws_instance.master-ec2[count.index].private_ip
+}
+
+
 #ROUTE53 CONFIG
 #Datasource for rhcee.support. route53 zone
 data "aws_route53_zone" "domain" {
@@ -954,7 +991,7 @@ resource "aws_route53_zone" "internal" {
   tags = {
     Name = "internal"
     Clusterid = var.cluster_name
-    "kubernetes.io/cluster/${var.cluster_name}" = "owned"
+    "kubernetes.io/cluster/${var.cluster_name}-${local.ran_string_tag}" = "shared"
   }
 }
 

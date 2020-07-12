@@ -41,26 +41,27 @@ variable "dns_domain_ID" {
   default = "Z1UPG9G4YY4YK6"
 }
 
-variable "rhel7-ami" {
-  description = "AMI on which the EC2 instances are based on, depends on the region"
+variable "rhcos-ami" {
+  description = "RHCOS AMI on which the EC2 instances are based on, depends on the region"
   type = map
   default = {
-    eu-central-1   = "ami-0b5edb134b768706c"
-    eu-west-1      = "ami-0404b890c57861c2d"
-    eu-west-2      = "ami-0fb2dd0b481d4dc1a"
-    eu-west-3      = "ami-0dc7b4dac85c15019"
-    eu-north-1     = "ami-030b10a31b2b6df19"
-    us-east-1      = "ami-0e9678b77e3f7cc96"
-    us-east-2      = "ami-0170fc126935d44c3"
-    us-west-1      = "ami-0d821453063a3c9b1"
-    us-west-2      = "ami-0c2dfd42fa1fbb52c"
-    sa-east-1      = "ami-09de00221562b0155"
-    ap-south-1     = "ami-0ec8900bf6d32e0a8"
-    ap-northeast-1 = "ami-0b355f24363d9f357"
-    ap-northeast-2 = "ami-0bd7fd9221135c533"
-    ap-southeast-1 = "ami-097e78d10c4722996"
-    ap-southeast-2 = "ami-0f7bc77e719f87581"
-    ca-central-1   = "ami-056db5ae05fa26d11"
+    eu-central-1   = "ami-0a8b58b4be8846e83"
+    eu-west-1      = "ami-0d2e5d86e80ef2bd4"
+    eu-west-2      = "ami-0a27424b3eb592b4d"
+    eu-west-3      = "ami-0a8cb038a6e583bfa"
+    eu-north-1     = "ami-04e659bd9575cea3d"
+    us-east-1      = "ami-0543fbfb4749f3c3b"
+    us-east-2      = "ami-070c6257b10036038"
+    us-west-1      = "ami-02b6556210798d665"
+    us-west-2      = "ami-0409b2cebfc3ac3d0"
+    sa-east-1      = "ami-0d020f4ea19dbc7fa"
+    ap-south-1     = "ami-0247a9f45f1917aaa"
+    ap-northeast-1 = "ami-05f59cf6db1d591fe"
+    ap-northeast-2 = "ami-06a06d31eefbb25c4"
+    ap-southeast-1 = "ami-0b628e07d986a6c36"
+    ap-southeast-2 = "ami-0bdd5c426d91caf8e"
+    ca-central-1   = "ami-0c6c7ce738fe5112b"
+    me-south-1     = "ami-0c9d86eb9d0acee5d"
   }
 }
 
@@ -75,6 +76,16 @@ variable "enable_proxy" {
   type  = bool
   default = false
 }
+
+#variable "user-data-bootstrap" {
+#  description = "User data for bootstrap EC2 instance"
+#  type = string
+#  default = <<-EOF
+#    - '{"ignition":{"config":{"replace":{"source":"${S3Loc}","verification":{}}},"timeouts":{},"version":"2.1.0"},"networkd":{},"passwd":{},"storage":{},"systemd":{}}'
+#    - {
+#      S3Loc: !Ref BootstrapIgnitionLocation
+#  EOF
+#}
 
 #LOCALS
 locals {
