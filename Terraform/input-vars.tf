@@ -5,16 +5,22 @@ variable "region_name" {
   default = "eu-west-1"
 }
 
-variable "domain_name" {
-  description = "Public DNS domain name" 
-  type = string
-  default = "tale"
-}
+#variable "domain_name" {
+#  description = "Public DNS domain name" 
+#  type = string
+#  default = "tale"
+#}
 
 variable "cluster_name" {
   description = "Cluster name, used to define Clusterid tag and as part of other component names"
   type = string
   default = "ocp"
+}
+
+#infra_name has no default value, see README.md to know how to get its value
+variable "infra_name" {
+  type = string
+  description = "Unique string based on the cluster_name used to create the names of other some components" 
 }
 
 variable "vpc_name" {
@@ -27,12 +33,6 @@ variable "subnet_count" {
   description = "Number of private and public subnets to a maximum of 3, there will be the same number of private and public subnets"
   type = number
   default = 3
-}
-
-variable "ssh-keyfile" {
-  description = "Name of the file with public part of the SSH key to transfer to the EC2 instances"
-  type = string
-  default = "ocp-ssh.pub"
 }
 
 variable "dns_domain_ID" {
@@ -81,6 +81,7 @@ variable "enable_proxy" {
 #  description = "User data for bootstrap EC2 instance"
 #  type = string
 #  default = <<-EOF
+#    - {"ignition":{"config":{"replace":{"source":"s3://terraform-20200712093906961900000001/bootstrap.ign","verification":{}}},"timeouts":{},"version":"2.1.0"},"networkd":{},"passwd":{},"storage":{},"systemd":{}}
 #    - '{"ignition":{"config":{"replace":{"source":"${S3Loc}","verification":{}}},"timeouts":{},"version":"2.1.0"},"networkd":{},"passwd":{},"storage":{},"systemd":{}}'
 #    - {
 #      S3Loc: !Ref BootstrapIgnitionLocation
@@ -97,7 +98,4 @@ private_subnet_count = var.subnet_count > 0 && var.subnet_count <= 3 ? var.subne
 
 #If the proxy is enable, only 1 public subnet is created for the bastion, otherwise the same number as for the private subnets
 public_subnet_count = var.enable_proxy ? 1 : local.private_subnet_count
-
-#Random constant string to add to the kubernetio.io/cluster tags
-ran_string_tag = random_string.sufix_name.result
 }

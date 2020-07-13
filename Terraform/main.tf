@@ -60,7 +60,7 @@ resource "aws_subnet" "subnet_pub" {
     tags = {
         Name = "subnet_pub.${count.index}"
         Clusterid = var.cluster_name
-        "kubernetes.io/cluster/${var.cluster_name}-${local.ran_string_tag}" = "shared"
+        "kubernetes.io/cluster/${var.infra_name}" = "shared"
     }
 }
 
@@ -76,7 +76,7 @@ resource "aws_subnet" "subnet_priv" {
   tags = {
       Name = "subnet_priv.${count.index}"
       Clusterid = var.cluster_name
-      "kubernetes.io/cluster/${var.cluster_name}-${local.ran_string_tag}" = "shared"
+      "kubernetes.io/cluster/${var.infra_name}" = "shared"
   }
 }
 
@@ -147,16 +147,6 @@ resource "aws_eip" "nateip" {
   }
 }
 
-#resource "aws_eip" "bastion_eip" {
-#    vpc = true
-#    instance = aws_instance.tale_bastion.id
-#
-#    tags = {
-#        Name = "bastion_eip"
-#        Clusterid = var.cluster_name
-#    }
-#}
-
 #NAT GATEWAYs
 resource "aws_nat_gateway" "natgw" {
     count = var.enable_proxy ? 0 : local.public_subnet_count
@@ -218,10 +208,9 @@ resource "aws_route_table_association" "rtabasso_nat_priv" {
 }
 
 #LOAD BALANCERS
-
 #External API loadbalancer
 resource "aws_lb" "ext_api_lb" {
-  name = "nlb-${var.cluster_name}-ext"
+  name = "nlb-${var.infra_name}-ext"
   internal = false
   load_balancer_type = "network"
   subnets = aws_subnet.subnet_pub.*.id
@@ -235,7 +224,7 @@ resource "aws_lb" "ext_api_lb" {
 #Target group for the external API NLB
 #Attachment to the target groups is defined next to the EC2 instances definition
 resource "aws_lb_target_group" "external_tg" {
-  name = "tg-external-lb"
+  name = "${var.infra_name}-ext-lb"
   port = 6443
   protocol = "TCP"
   target_type = "ip"
@@ -261,7 +250,7 @@ resource "aws_lb_listener" "external_listener" {
 
 #Internal API loadbalancer
 resource "aws_lb" "int_api_lb" {
-  name = "nlb-${var.cluster_name}-int"
+  name = "nlb-${var.infra_name}-int"
   internal = true
   load_balancer_type = "network"
   subnets = aws_subnet.subnet_priv.*.id
@@ -274,7 +263,7 @@ resource "aws_lb" "int_api_lb" {
 
 #Target group for the internal API NLB
 resource "aws_lb_target_group" "internal_tg" {
-  name = "tg-internal-lb"
+  name = "${var.infra_name}-int-lb"
   port = 6443
   protocol = "TCP"
   target_type = "ip"
@@ -300,7 +289,7 @@ resource "aws_lb_listener" "internal_listener" {
 
 #Target group for the internal service API NLB
 resource "aws_lb_target_group" "internal_service_tg" {
-  name = "tg-internal-service-lb"
+  name = "${var.infra_name}-intsvc-lb"
   port = 22623
   protocol = "TCP"
   target_type = "ip"
@@ -327,7 +316,7 @@ resource "aws_lb_listener" "internal_service_listener" {
 #IAM
 #IAM role for master EC2 instances
 resource "aws_iam_role" "master-role" {
-  name = "${var.cluster_name}-master-role"
+  name = "${var.infra_name}-master-role"
 
   assume_role_policy = <<EOF
 {
@@ -350,7 +339,7 @@ EOF
 
 #Policies for the master role
 resource "aws_iam_role_policy" "master-policy" {
-  name = "${var.cluster_name}-master-policy"
+  name = "${var.infra_name}-master-policy"
   role = aws_iam_role.master-role.id
 
   policy = <<EOF
@@ -392,13 +381,13 @@ EOF
 
 #Instance profile for the master role
 resource "aws_iam_instance_profile" "master-profile" {
-  name = "${var.cluster_name}-master-profile"
+  name = "${var.infra_name}-master-profile"
   role = aws_iam_role.master-role.name
 }
 
 #IAM role for worker EC2 instances
 resource "aws_iam_role" "worker-role" {
-  name = "${var.cluster_name}-worker-role"
+  name = "${var.infra_name}-worker-role"
 
   assume_role_policy = <<EOF
 {
@@ -421,7 +410,7 @@ EOF
 
 #Policies for the worker role
 resource "aws_iam_role_policy" "worker-policy" {
-  name = "${var.cluster_name}-worker-policy"
+  name = "${var.infra_name}-worker-policy"
   role = aws_iam_role.worker-role.id
 
   policy = <<EOF
@@ -442,13 +431,13 @@ EOF
 
 #Instance profile for the worker role
 resource "aws_iam_instance_profile" "worker-profile" {
-  name = "${var.cluster_name}-worker-profile"
+  name = "${var.infra_name}-worker-profile"
   role = aws_iam_role.worker-role.name
 }
 
 #IAM role for bootstrap EC2 instance
 resource "aws_iam_role" "bootstrap-role" {
-  name = "${var.cluster_name}-bootstrap-role"
+  name = "${var.infra_name}-bootstrap-role"
   path = "/"
 
   assume_role_policy = <<EOF
@@ -472,7 +461,7 @@ EOF
 
 #Policies for the bootstrap role
 resource "aws_iam_role_policy" "bootstrap-policy" {
-  name = "${var.cluster_name}-bootstrap-policy"
+  name = "${var.infra_name}-bootstrap-policy"
   role = aws_iam_role.bootstrap-role.id
 
   policy = <<EOF
@@ -514,7 +503,7 @@ EOF
 
 #Instance profile for the bootstrap role
 resource "aws_iam_instance_profile" "bootstrap-profile" {
-  name = "${var.cluster_name}-bootstrap-profile"
+  name = "${var.infra_name}-bootstrap-profile"
   role = aws_iam_role.bootstrap-role.name
   path = "/"
 }
@@ -522,11 +511,12 @@ resource "aws_iam_instance_profile" "bootstrap-profile" {
 #SECURITY GROUPS
 #Master security group
 resource "aws_security_group" "master-sg" {
-    name = "${var.cluster_name}-master-sg"
+    name = "${var.infra_name}-master-sg"
     description = "Security group for master nodes"
     vpc_id = aws_vpc.vpc.id
 
     tags = {
+        Name = "${var.infra_name}-master-sg"
         Clusterid = var.cluster_name
     }
 }
@@ -562,7 +552,7 @@ resource "aws_security_group_rule" "api-master" {
 
 resource "aws_security_group_rule" "ignition-master" {
   type = "ingress"
-  description = "ignition config"
+  description = "ignition config files"
   from_port = 22623
   to_port = 22623
   protocol = "tcp"
@@ -662,11 +652,12 @@ resource "aws_security_group_rule" "services-master-self" {
 
 #Worker security group
 resource "aws_security_group" "worker-sg" {
-    name = "${var.cluster_name}-worker-sg"
+    name = "${var.infra_name}-worker-sg"
     description = "Security group for worker nodes"
     vpc_id = aws_vpc.vpc.id
 
     tags = {
+        Name = "${var.infra_name}-worker-sg"
         Clusterid = var.cluster_name
     }
 }
@@ -772,7 +763,7 @@ resource "aws_security_group_rule" "services-worker-self" {
 
 #Bootstrap security group
 resource "aws_security_group" "bootstrap-sg" {
-    name = "${var.cluster_name}-bootstrap-sg"
+    name = "${var.infra_name}-bootstrap-sg"
     description = "Security group for bootstrap node"
     vpc_id = aws_vpc.vpc.id
 
@@ -791,6 +782,7 @@ resource "aws_security_group" "bootstrap-sg" {
     }
 
     tags = {
+        Name = "${var.infra_name}-bootstrap-sg"
         Clusterid = var.cluster_name
     }
 }
@@ -826,12 +818,6 @@ resource "aws_security_group_rule" "outbound-all-bootstrap-sgr" {
 }
 
 ###EC2s
-###SSH key
-#resource "aws_key_pair" "ssh-key" {
-#  key_name = "ssh-key-${random_string.sufix_name.result}"
-#  public_key = file("${path.module}/${var.ssh-keyfile}")
-#}
-#
 #Bootstrap 
 resource "aws_instance" "bootstrap-ec2" {
   ami = var.rhcos-ami[var.region_name]
@@ -844,9 +830,9 @@ resource "aws_instance" "bootstrap-ec2" {
   }
 
   tags = {
-        Name = "boostrap-${var.cluster_name}"
+        Name = "boostrap-${var.infra_name}"
         Clusterid = var.cluster_name
-        "kubernetes.io/cluster/${var.cluster_name}-${local.ran_string_tag}" = "shared"
+        "kubernetes.io/cluster/${var.infra_name}" = "shared"
   }
 }
 
@@ -898,9 +884,9 @@ resource "aws_instance" "master-ec2" {
   }
 
   tags = {
-        Name = "master-${var.cluster_name}.${count.index}"
+        Name = "master-${var.infra_name}.${count.index}"
         Clusterid = var.cluster_name
-        "kubernetes.io/cluster/${var.cluster_name}-${local.ran_string_tag}" = "shared"
+        "kubernetes.io/cluster/${var.infra_name}" = "shared"
   }
 }
 
@@ -944,32 +930,32 @@ data "aws_route53_zone" "domain" {
 }
 
 ##External hosted zone, this is a public zone because it is not associated with a VPC. 
-resource "aws_route53_zone" "external" {
-  name = "${var.domain_name}.${data.aws_route53_zone.domain.name}"
-
-  tags = {
-    Name = "external"
-    Clusterid = var.cluster_name
-  }
-}
-
-resource "aws_route53_record" "external-ns" {
-  zone_id = data.aws_route53_zone.domain.zone_id
-  name    = "${var.domain_name}.${data.aws_route53_zone.domain.name}"
-  type    = "NS"
-  ttl     = "30"
-
-  records = [
-    "${aws_route53_zone.external.name_servers.0}",
-    "${aws_route53_zone.external.name_servers.1}",
-    "${aws_route53_zone.external.name_servers.2}",
-    "${aws_route53_zone.external.name_servers.3}",
-  ]
-}
+#resource "aws_route53_zone" "external" {
+#  name = "${var.domain_name}.${data.aws_route53_zone.domain.name}"
+#
+#  tags = {
+#    Name = "external"
+#    Clusterid = var.cluster_name
+#  }
+#}
+#
+#resource "aws_route53_record" "external-ns" {
+#  zone_id = data.aws_route53_zone.domain.zone_id
+#  name    = "${var.domain_name}.${data.aws_route53_zone.domain.name}"
+#  type    = "NS"
+#  ttl     = "30"
+#
+#  records = [
+#    "${aws_route53_zone.external.name_servers.0}",
+#    "${aws_route53_zone.external.name_servers.1}",
+#    "${aws_route53_zone.external.name_servers.2}",
+#    "${aws_route53_zone.external.name_servers.3}",
+#  ]
+#}
 
 #External API DNS record
 resource "aws_route53_record" "api-external" {
-    zone_id = aws_route53_zone.external.zone_id
+    zone_id = var.dns_domain_ID
     name = "api.${var.cluster_name}"
     type = "A"
 
@@ -982,16 +968,16 @@ resource "aws_route53_record" "api-external" {
 
 #Internal hosted zone, this is private because it is associated with a VPC.
 resource "aws_route53_zone" "internal" {
-  name = "${var.cluster_name}.${var.domain_name}.${data.aws_route53_zone.domain.name}"
+  name = "${var.cluster_name}.${data.aws_route53_zone.domain.name}" 
 
   vpc {
     vpc_id = aws_vpc.vpc.id
   }
 
   tags = {
-    Name = "internal"
+    Name = "${var.infra_name}-internal"
     Clusterid = var.cluster_name
-    "kubernetes.io/cluster/${var.cluster_name}-${local.ran_string_tag}" = "shared"
+    "kubernetes.io/cluster/${var.infra_name}" = "owned"
   }
 }
 
