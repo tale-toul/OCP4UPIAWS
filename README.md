@@ -179,4 +179,6 @@ $ terraform apply -var="region_name=eu-west-3" -var="cluster_name=clover" -var="
 
 * The external DNS zone must exist prior to running terraform because it is required by the openshift installer program, therefore it cannot be created later by terraform.  It could be created by an idependent terraform module that is run before the openshift installer program though.
 
-* The bootstrap instance and related resources creation should be done in an independent module, so they can be easily deleted after installation.
+* The bootstrap instance and related resources (S3 bucket for boostrap ignition file), creation should be done in an independent module, so they can be easily deleted after installation.
+
+* Add user defined tags to the install-config.yaml file

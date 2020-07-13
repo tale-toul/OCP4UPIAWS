@@ -1006,6 +1006,30 @@ resource "aws_route53_record" "api-internal-internal" {
       evaluate_target_health = false
     }
 }
+
+#S3
+#S3 disk to store ignition config files
+resource "aws_s3_bucket" "ignition-bucket" {
+  bucket = "${var.infra_name }-ignition"
+  region = var.region_name
+  force_destroy = true
+
+  acl    = "private"
+
+  tags = {
+    Name  = "${var.infra_name }-ignition"
+    Clusterid = var.cluster_name
+  }
+}
+
+#Copy bootstrap ignition file to the above bucket
+resource "aws_s3_bucket_object" "bootstrap-ignition-file" {
+  bucket = aws_s3_bucket.ignition-bucket.id
+  key = "bootstrap.ign"
+  source = "${path.module}/../${var.cluster_name}/bootstrap.ign"
+  etag   = filemd5("${path.module}/../${var.cluster_name}/bootstrap.ign")
+}
+
 ##OUTPUT
 output "api_extenal_name" {
   value     = aws_route53_record.api-external.fqdn
@@ -1042,4 +1066,9 @@ output "private_subnet_cidr_block" {
 output "enable_proxy" {
   value = var.enable_proxy
   description = "Is the proxy enabled or not?"
+}
+
+output "ignition-s3-bucket" {
+  value = aws_s3_bucket.ignition-bucket.id
+  description ="S3 bucket used to store the bootstrap ignition config file"
 }
