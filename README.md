@@ -4,7 +4,7 @@
 
 ## Introduction
 
-This project contains the necesary elements to deploy an Openshift 4 cluster on AWS using the UPI installation method
+This project contains the necesary elements to deploy an Openshift 4.4 cluster on AWS using the UPI installation method
 
 ## Installation instructions
 
@@ -12,7 +12,11 @@ This instructions follow the ones provided in [Installing a cluster on user-prov
 
 1. [Download the installation program](https://docs.openshift.com/container-platform/4.4/installing/installing_aws/installing-aws-user-infra.html#installation-obtaining-installer_installing-aws-user-infra)
 
-1. [Create an ssh key pair](https://docs.openshift.com/container-platform/4.4/installing/installing_aws/installing-aws-user-infra.html#ssh-agent-using_installing-aws-user-infra).- This key will be installed on every node in the cluster and will allow pawordless connections to those machines.
+1. [Create an ssh key pair](https://docs.openshift.com/container-platform/4.4/installing/installing_aws/installing-aws-user-infra.html#ssh-agent-using_installing-aws-user-infra).- This key will be installed on every node in the cluster and will allow pawordless connections to those machines.  This step is not extrictly required for twu reason: 
+
+  1. ssh connections to the cluster instances are not required, quite the contrary they are discourage, but it is a convenient tool in case issues come up during cluster installation.
+
+  1. An already existinig ssh key pair can be used, as long as it is present in the direcotry ~/.ssh
 
 ```shell
  $ ssh-keygen -o -t rsa -f upi-ssh -N "" -b 4096
@@ -24,11 +28,11 @@ The previous command will produce two files: upi-ssh and upi-ssh.pub.  Copy them
 $ cp upi-ssh* ~/.ssh
 ```
 
-1. [Create the **install-config.yaml** file](https://docs.openshift.com/container-platform/4.4/installing/installing_aws/installing-aws-user-infra.html#installation-generate-aws-user-infra-install-config_installing-aws-user-infra).- This file is the configuration file that will describe the cluster to be installed, and it is fed to the installer program.  The easiest way to create the file is by using the install program with the options "create install-config" and answer the questions asked.  The option **--dir** is followed by a directory name, it is best to use a new empty directory to avoid conflic with any other installation, if the directory does not exist the installation program will create it:
+1. [Create the **install-config.yaml** file](https://docs.openshift.com/container-platform/4.4/installing/installing_aws/installing-aws-user-infra.html#installation-generate-aws-user-infra-install-config_installing-aws-user-infra).- This is the configuration file that will describe the cluster to be installed, and it is fed to the installer program.  The easiest way to create the file is by using the install program with the options "create install-config" and answer the questions asked.  The option **--dir** is followed by a directory name, it is best to use an empty directory or a non existing one to avoid conflic with any previous installation, if the directory does not exist the installation program will create it:
  The base domain for the cluster must exist before running the command, otherwise the installer program will not get pass that question.
 
 ```shell
- $ $ ./openshift-install create install-config --dir clovercluster
+ $ $ ./openshift-install create install-config --dir clover
 ? SSH Public Key /home/jjerezro/.ssh/upi-ssh.pub
 ? Platform aws
 INFO Credentials loaded from the "default" profile in file "/home/jjerezro/.aws/credentials" 
@@ -44,7 +48,7 @@ INFO Credentials loaded from the "default" profile in file "/home/jjerezro/.aws/
 ? Cluster Name clover
 ? Pull Secret [? for help] **************************************************************
 ```
-The previous command will create the directory _clovercluster_ if this does not already exist, and will put the file **install-config.yaml** inside the directory.
+The previous command will create the directory _clover_ if it does not already exist, and will put the file **install-config.yaml** inside the directory.
 
 1. Edit the **install-config.yaml** file and se the number of worker replicas to 0.  Make any other changes to the file required for the installation:
 
@@ -57,12 +61,12 @@ compute:
   replicas: 0
 ```
 
-1. Make a backup copy of the **install-config.yaml** file, because the file will be destroyed as part of the installation process:
+1. Make a backup copy of the **install-config.yaml** file, because it will be destroyed as part of the installation process:
 
 1. Create the Kubernetes manifests for the cluster
 
 ```shell
- $ $ ./openshift-install create manifests --dir clover/
+ $ ./openshift-install create manifests --dir clover
 INFO Credentials loaded from the "default" profile in file "/home/jjerezro/.aws/credentials" 
 INFO Consuming Install Config from target directory 
 WARNING Making control-plane schedulable by setting MastersSchedulable to true for Scheduler cluster settings
@@ -73,14 +77,14 @@ WARNING Making control-plane schedulable by setting MastersSchedulable to true f
 $ rm clover/openshift/99_openshift-cluster-api_master-machines-*.yaml
 $ rm clover/openshift/99_openshift-cluster-api_worker-machineset-*.yaml
 ```
-1. Edit the file **cluster-scheduler-02-config.yml** in the manifests directory and set the parameter **mastersSchedulable** to **false** to prevent pods from being scheduled on the master machines:
+1. Edit the file **manifests/cluster-scheduler-02-config.yml**  and set the parameter **mastersSchedulable** to **false** to prevent pods from being scheduled on the master machines:
 
 ```yaml
 spec:
   mastersSchedulable: false
 ```
 
-1. Make sure that the tags section in the file manifests/cluster-dns-02-config.yml are the same that will later be used to create the infrastructure, and the public zone id is also the same that will be used by terraform.
+1. Make sure that the tags section in the file **manifests/cluster-dns-02-config.yml** are the same that will later be used by terraform to create the infrastructure, and the public zone id is also the same that will be used by terraform.
 
 ```yaml
 spec:
@@ -96,7 +100,7 @@ spec:
 1. Create the ignition files.  
 
 ```shell
-$ ./openshift-install create ignition-configs --dir clover/
+$ ./openshift-install create ignition-configs --dir clover
 INFO Consuming OpenShift Install (Manifests) from target directory 
 INFO Consuming Master Machines from target directory 
 INFO Consuming Worker Machines from target directory 
@@ -188,10 +192,49 @@ Hosted Zone ID: Z00659431CO1O47AE0285
 ```
 The ID will be used with the variable **dns_domain_ID**
 
+Define the variable **master_ign_CA** with the base64 definition of the CA certificate that will use master and nodes.
+
 Review the rest of variable in the file input-vars.tf, then go to the Terraform directory and run a command like:
 
 ```shell
 $ terraform apply -var="region_name=eu-west-3" -var="cluster_name=clover" -var="infra_name=clover-ltwcq" -var="dns_domain_ID=Z00659431CO1O47AE0285"
+```
+When the infrastructure has been created, run the following command to check on the installationm process:
+```shell
+$ ./openshift-install wait-for bootstrap-complete --dir=clover --log-level=info
+```
+
+The log file for the installation may be usefull, it is located at **clover/.openshift_install.log**
+
+Another way to peek into the installation process is to ssh into the bootstrap instance and run the journalct command:
+
+```shell
+$ ssh-agent bash
+$ ssh-add ~/.ssh/upi-ssh
+$ ssh core@<IP of bootstrap instance>
+bootstrap $ journalctl -b -f -u bootkube.service
+
+```
+
+
+## User data for the instances
+
+Each of the EC2 instance definition for bootstrap, master and nodes need a user data block that will instruct the instance on where to get the ignition file required to do the initial set up of the instance.
+
+The _Boostrap_ instance user data basically contains the URL to get the file **bootstrap.ign** that was generated during the first steps of the installation process.  This file is stored in an S3 bucket that is created by terraform, the **bootstrap.ign** file is copied to the bucket also by terraform.
+
+The URL used to access the file is defined in terraform like: `s3://${aws_s3_bucket.ignition-bucket.id}/bootstrap.ign`  The variable contains the name of the bucket.  The only important consideration here is that the bucket and file exist before the bootstrap instance is created and started, so the following line is added to the bootstrap's definition:
+```
+  depends_on = [aws_s3_bucket.ignition-bucket]
+```
+
+The _Master_ instances user data also contains the URL to download its ignition file, in this case an HTTPS URL is used. The use of a secure TLS connection requires the user data to also contains the CA certificate required to validate the web server's certificate.
+The URL for the ignition file is defined like: `https://api-int.${var.cluster_name}.${local.dotless_domain}:22623/config/master`  The variable **${local.dotless_domain}** is defined as `dotless_domain = replace("${data.aws_route53_zone.domain.name}","/.$/","")` this function takes the domain name for the internal hosted zone and removes the last dot in the name, for example for the name **example.com.** the function returns **example.com** without the final dot. This step is required because the hosted zone domain name includes a dot at the end, which renders the URL invalid.  The final URL for a cluster name of clover would be `https://api-int.clover.example.com:22623/config/master`
+The Certificate Autority (CA) certificate is stored in the variable **${var.master_ign_CA}**, this variable is defined during the installation steps.
+It is import that the DNS record for **api-int** exists before creating the master instance, so the following line is added to the master's definition:
+
+```
+  depends_on = [aws_route53_record.api-internal-internal]
 ```
 
 ## References
@@ -206,3 +249,7 @@ $ terraform apply -var="region_name=eu-west-3" -var="cluster_name=clover" -var="
 * The bootstrap instance and related resources (S3 bucket for boostrap ignition file), creation should be done in an independent module, so they can be easily deleted after installation.
 
 * Add user defined tags to the install-config.yaml file
+
+* Define the instance type for master and workers in variables
+
+* Tag all resources created by terraform with kubernetes.io/cluster/....

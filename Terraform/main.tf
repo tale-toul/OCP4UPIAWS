@@ -870,7 +870,7 @@ resource "aws_lb_target_group_attachment" "bootstrap-external-service-attach" {
   target_id = aws_instance.bootstrap-ec2.private_ip
 }
 
-#Masters EC2 instances
+#Master EC2 instances
 resource "aws_instance" "master-ec2" {
   count = local.private_subnet_count
   depends_on = [aws_route53_record.api-internal-internal]
@@ -932,6 +932,46 @@ resource "aws_lb_target_group_attachment" "master-external-service-attach" {
   target_id = aws_instance.master-ec2[count.index].private_ip
 }
 
+#Worker EC2 instances
+resource "aws_instance" "worker-ec2" {
+  count = local.private_subnet_count
+  depends_on = [aws_instance.master-ec2]
+  ami = var.rhcos-ami[var.region_name]
+  iam_instance_profile = aws_iam_instance_profile.worker-profile.name
+  instance_type = "m5.large"
+
+  root_block_device {
+      volume_size = 120
+      volume_type = "gp2"
+      delete_on_termination = true
+  }
+
+  network_interface {
+    device_index = 0
+    network_interface_id = aws_network_interface.worker-nic[count.index].id
+  }
+
+  user_data = <<-EOF
+    {"ignition":{"config":{"append":[{"source":"https://api-int.${var.cluster_name}.${local.dotless_domain}:22623/config/worker","verification":{}}]},"security":{"tls":{"certificateAuthorities":[{"source":"${var.master_ign_CA}","verification":{}}]}},"timeouts":{},"version":"2.2.0"},"networkd":{},"passwd":{},"storage":{},"systemd":{}}
+  EOF
+
+  tags = {
+        Name = "worker-${var.infra_name}.${count.index}"
+        Clusterid = var.cluster_name
+        "kubernetes.io/cluster/${var.infra_name}" = "shared"
+  }
+}
+
+#Network interface for the worker EC2 instances
+resource "aws_network_interface" "worker-nic" {
+  count = local.private_subnet_count
+  security_groups = [aws_security_group.worker-sg.id]
+  subnet_id = aws_subnet.subnet_priv[count.index].id
+
+  tags = {
+        Clusterid = var.cluster_name
+  }
+}
 
 #ROUTE53 CONFIG
 #Datasource for rhcee.support. route53 zone

@@ -5,12 +5,6 @@ variable "region_name" {
   default = "eu-west-1"
 }
 
-#variable "domain_name" {
-#  description = "Public DNS domain name" 
-#  type = string
-#  default = "tale"
-#}
-
 variable "cluster_name" {
   description = "Cluster name, used to define Clusterid tag and as part of other component names"
   type = string
@@ -38,7 +32,7 @@ variable "subnet_count" {
 variable "dns_domain_ID" {
   description = "Zone ID for the route 53 DNS domain that will be used for this cluster"
   type = string
-  default = "Z1UPG9G4YY4YK6"
+  default = "Z00639431CO8O47BE0285"
 }
 
 variable "rhcos-ami" {
