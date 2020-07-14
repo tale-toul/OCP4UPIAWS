@@ -6,11 +6,46 @@
 
 This project contains the necesary elements to deploy an Openshift 4.4 cluster on AWS using the UPI installation method
 
+## Requirements
+
+* An [AWS account](https://aws.amazon.com) with sufficient privileges to create the resources required by Openshift.
+
+* A public DNS domain managed by AWS, to publish the cluster on.  There is a convenient module to create a DNS subdomain in the directory  **ExternalDNSHostedZone**.  If the cluster is private this DNS domain is not required but at the moment this project will not create a private cluster.
+
+* A [Red Hat account](https://cloud.redhat.com) 
+
+* At least 500MB of disk space in the machine where the installation is run from
+
+* [Terraform](https://www.terraform.io/) must be installed in the local machine.
+  The installation of terraform is as simple as downloading a zip compiled binary package for your operating system and architecture from:
+  
+  [https://www.terraform.io/downloads.html](https://www.terraform.io/downloads.html)
+  
+  Then unzip the file:
+  
+  ```shell
+  # unzip terraform_0.11.8_linux_amd64.zip 
+  Archive:  terraform_0.11.8_linux_amd64.zip
+  inflating: terraform
+  ```
+  Place the binary somewhere in your path:
+  
+  ```shell
+  # cp terraform /usr/local/bin
+  ```
+  Check that it is working:
+  
+  ```shell
+  # terraform --version
+  ```
+
 ## Installation instructions
 
-This instructions follow the ones provided in [Installing a cluster on user-provisioned infrastructure in AWS by using CloudFormation templates:](https://docs.openshift.com/container-platform/4.4/installing/installing_aws/installing-aws-user-infra.html)
+The installation steps follow the instructions provided at [Installing a cluster on user-provisioned infrastructure in AWS by using CloudFormation templates:](https://docs.openshift.com/container-platform/4.4/installing/installing_aws/installing-aws-user-infra.html), but instead of CloudFormation, Terraform is used to create the resources in AWS.
 
-1. [Download the installation program](https://docs.openshift.com/container-platform/4.4/installing/installing_aws/installing-aws-user-infra.html#installation-obtaining-installer_installing-aws-user-infra)
+1. [Download the installation program](https://cloud.redhat.com/openshift/install) for the AWS cloud provider
+
+1. [Download the pull secret](https://cloud.redhat.com/openshift/install) from the same page as the installer.
 
 1. [Create an ssh key pair](https://docs.openshift.com/container-platform/4.4/installing/installing_aws/installing-aws-user-infra.html#ssh-agent-using_installing-aws-user-infra).- This key will be installed on every node in the cluster and will allow pawordless connections to those machines.  This step is not extrictly required for twu reason: 
 
@@ -28,14 +63,23 @@ The previous command will produce two files: upi-ssh and upi-ssh.pub.  Copy them
 $ cp upi-ssh* ~/.ssh
 ```
 
-1. [Create the **install-config.yaml** file](https://docs.openshift.com/container-platform/4.4/installing/installing_aws/installing-aws-user-infra.html#installation-generate-aws-user-infra-install-config_installing-aws-user-infra).- This is the configuration file that will describe the cluster to be installed, and it is fed to the installer program.  The easiest way to create the file is by using the install program with the options "create install-config" and answer the questions asked.  The option **--dir** is followed by a directory name, it is best to use an empty directory or a non existing one to avoid conflic with any previous installation, if the directory does not exist the installation program will create it:
- The base domain for the cluster must exist before running the command, otherwise the installer program will not get pass that question.
+1. [Create the **install-config.yaml** file](https://docs.openshift.com/container-platform/4.4/installing/installing_aws/installing-aws-user-infra.html#installation-generate-aws-user-infra-install-config_installing-aws-user-infra).- This is the configuration file that will describe the cluster to be installed. The easiest way to create the file is by using the install program with the options **"create install-config"** and answer the questions asked.  The option **--dir** is followed by a directory name, it is best to use an empty directory or a non existing one to avoid conflic with any previous installation, if the directory does not exist the installation program will create it:
+
+The command will ask:
+
+* For the ssh keys that will be installed in the EC2 instances
+* The platform provider, AWS in this case
+* The credentials of the AWS account to use to deploy the resources.  If the file ~/.aws/credentials exists and contains valid credentials, these will be used.
+* The AWS region where the cluster will be deployed
+* The base DNS domain to use for the cluster public URLs.  This domain must already exist and be managed by AWS.
+* A name for the cluster, used as the base for naming the resources, and will be added to the above DNS domain
+* The pull secret to download container images from Red Hat.  The pull secret is pasted on the console when the installer asks for it.
 
 ```shell
  $ $ ./openshift-install create install-config --dir clover
 ? SSH Public Key /home/jjerezro/.ssh/upi-ssh.pub
 ? Platform aws
-INFO Credentials loaded from the "default" profile in file "/home/jjerezro/.aws/credentials" 
+INFO Credentials loaded from the "default" profile in file "/home/indalpa/.aws/credentials" 
 ? Region eu-west-3
 ? Base Domain lili  [Use arrows to move, enter to select, type to filter, ? for more help]
 FATAL failed to fetch Install Config: failed to fetch dependency of "Install Config": failed to generate asset "Base Domain": failed UserInput for base domain: interrupt 
@@ -50,7 +94,7 @@ INFO Credentials loaded from the "default" profile in file "/home/jjerezro/.aws/
 ```
 The previous command will create the directory _clover_ if it does not already exist, and will put the file **install-config.yaml** inside the directory.
 
-1. Edit the **install-config.yaml** file and se the number of worker replicas to 0.  Make any other changes to the file required for the installation:
+1. Edit the **install-config.yaml** file and set the number of worker replicas to 0.  Make any other changes to the file required for the installation:
 
 ```yaml
 compute:
@@ -133,30 +177,6 @@ variable "master_ign_CA" {
 ## Deploying the infrastructure with terraform
 
 Terraform is used to create the infrastructure components of the VPC, some of these components can be adjusted via the use of variables defined in the file _Terrafomr/input-vars.tf_, like if a proxy is used to manage connections from the cluster to the Internet, the name of the cluster, the name of the DNS subdomain, etc.
-
-### Terraform installation
-
-The installation of terraform is as simple as downloading a zip compiled binary package for your operating system and architecture from:
-
-[https://www.terraform.io/downloads.html](https://www.terraform.io/downloads.html)
-
-Then unzip the file:
-
-```shell
-# unzip terraform_0.11.8_linux_amd64.zip 
-Archive:  terraform_0.11.8_linux_amd64.zip
-inflating: terraform
-```
-Place the binary somewhere in your path:
-
-```shell
-# cp terraform /usr/local/bin
-```
-Check that it is working:
-
-```shell
-# terraform --version
-```
 
 ### Terraform initialization
 
