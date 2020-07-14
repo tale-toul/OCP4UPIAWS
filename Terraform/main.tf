@@ -823,11 +823,16 @@ resource "aws_instance" "bootstrap-ec2" {
   ami = var.rhcos-ami[var.region_name]
   iam_instance_profile = aws_iam_instance_profile.bootstrap-profile.name
   instance_type = "m5.large"
+  depends_on = [aws_s3_bucket.ignition-bucket]
   
   network_interface {
     device_index = 0
     network_interface_id = aws_network_interface.bootstrap-nic.id
   }
+
+  user_data = <<-EOF
+    {"ignition":{"config":{"replace":{"source":"s3://${aws_s3_bucket.ignition-bucket.id}/bootstrap.ign","verification":{}}},"timeouts":{},"version":"2.1.0"},"networkd":{},"passwd":{},"storage":{},"systemd":{}}
+  EOF
 
   tags = {
         Name = "boostrap-${var.infra_name}"
@@ -868,6 +873,7 @@ resource "aws_lb_target_group_attachment" "bootstrap-external-service-attach" {
 #Masters EC2 instances
 resource "aws_instance" "master-ec2" {
   count = local.private_subnet_count
+  depends_on = [aws_route53_record.api-internal-internal]
   ami = var.rhcos-ami[var.region_name]
   iam_instance_profile = aws_iam_instance_profile.master-profile.name
   instance_type = "m5.xlarge"
@@ -882,6 +888,10 @@ resource "aws_instance" "master-ec2" {
     device_index = 0
     network_interface_id = aws_network_interface.master-nic[count.index].id
   }
+
+  user_data = <<-EOF
+    {"ignition":{"config":{"append":[{"source":"https://api-int.${var.cluster_name}.${local.dotless_domain}:22623/config/master","verification":{}}]},"security":{"tls":{"certificateAuthorities":[{"source":"${var.master_ign_CA}","verification":{}}]}},"timeouts":{},"version":"2.2.0"},"networkd":{},"passwd":{},"storage":{},"systemd":{}}
+  EOF
 
   tags = {
         Name = "master-${var.infra_name}.${count.index}"
@@ -929,30 +939,6 @@ data "aws_route53_zone" "domain" {
   zone_id = var.dns_domain_ID
 }
 
-##External hosted zone, this is a public zone because it is not associated with a VPC. 
-#resource "aws_route53_zone" "external" {
-#  name = "${var.domain_name}.${data.aws_route53_zone.domain.name}"
-#
-#  tags = {
-#    Name = "external"
-#    Clusterid = var.cluster_name
-#  }
-#}
-#
-#resource "aws_route53_record" "external-ns" {
-#  zone_id = data.aws_route53_zone.domain.zone_id
-#  name    = "${var.domain_name}.${data.aws_route53_zone.domain.name}"
-#  type    = "NS"
-#  ttl     = "30"
-#
-#  records = [
-#    "${aws_route53_zone.external.name_servers.0}",
-#    "${aws_route53_zone.external.name_servers.1}",
-#    "${aws_route53_zone.external.name_servers.2}",
-#    "${aws_route53_zone.external.name_servers.3}",
-#  ]
-#}
-
 #External API DNS record
 resource "aws_route53_record" "api-external" {
     zone_id = var.dns_domain_ID
@@ -968,14 +954,14 @@ resource "aws_route53_record" "api-external" {
 
 #Internal hosted zone, this is private because it is associated with a VPC.
 resource "aws_route53_zone" "internal" {
-  name = "${var.cluster_name}.${data.aws_route53_zone.domain.name}" 
+  name = "${var.cluster_name}.${data.aws_route53_zone.domain.name}"
 
   vpc {
     vpc_id = aws_vpc.vpc.id
   }
 
   tags = {
-    Name = "${var.infra_name}-internal"
+    Name = "${var.infra_name}-int"
     Clusterid = var.cluster_name
     "kubernetes.io/cluster/${var.infra_name}" = "owned"
   }
@@ -1029,6 +1015,7 @@ resource "aws_s3_bucket_object" "bootstrap-ignition-file" {
   source = "${path.module}/../${var.cluster_name}/bootstrap.ign"
   etag   = filemd5("${path.module}/../${var.cluster_name}/bootstrap.ign")
 }
+
 
 ##OUTPUT
 output "api_extenal_name" {

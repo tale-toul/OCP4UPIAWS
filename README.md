@@ -24,7 +24,7 @@ The previous command will produce two files: upi-ssh and upi-ssh.pub.  Copy them
 $ cp upi-ssh* ~/.ssh
 ```
 
-1. [Create the **install-config.yaml** file](https://docs.openshift.com/container-platform/4.4/installing/installing_aws/installing-aws-user-infra.html#installation-generate-aws-user-infra-install-config_installing-aws-user-infra).- This file is the configuration file that will describe the cluster to be installed, and it is fed to the installer program.  An easy way to create the file is by using the install program with the options "create install-config" and answer the questions asked.  The option **--dir** is followed by a directory name, it is best to use a new empty directory to avoid conflic with any other installation, if the directory does not exist the installation program will create it:
+1. [Create the **install-config.yaml** file](https://docs.openshift.com/container-platform/4.4/installing/installing_aws/installing-aws-user-infra.html#installation-generate-aws-user-infra-install-config_installing-aws-user-infra).- This file is the configuration file that will describe the cluster to be installed, and it is fed to the installer program.  The easiest way to create the file is by using the install program with the options "create install-config" and answer the questions asked.  The option **--dir** is followed by a directory name, it is best to use a new empty directory to avoid conflic with any other installation, if the directory does not exist the installation program will create it:
  The base domain for the cluster must exist before running the command, otherwise the installer program will not get pass that question.
 
 ```shell
@@ -80,6 +80,19 @@ spec:
   mastersSchedulable: false
 ```
 
+1. Make sure that the tags section in the file manifests/cluster-dns-02-config.yml are the same that will later be used to create the infrastructure, and the public zone id is also the same that will be used by terraform.
+
+```yaml
+spec:
+  baseDomain: clover.tale.rhcee.support
+  privateZone:
+    tags:
+      Name: clover-qvml2-int
+      kubernetes.io/cluster/clover-qvml2: owned
+  publicZone:
+    id: Z00639231CO3O47AE0285
+```
+
 1. Create the ignition files.  
 
 ```shell
@@ -99,6 +112,18 @@ clover-ltwcq
 ```
 
 The value returned must be used with the variable **infra_name** when running terraform
+
+1. Get the encoded certificate authority to be used by the master instances.  This is the long string located in the master ignition file **master.ign** and looks like this:
+
+`data:text/plain;charset=utf-8;base64,LS0tLS1CRUdJTiBDRVJUSUZJQ0<long string of characters>==`
+
+This long string must be assigned to the variable **master_ign_CA**, this could be done in the command line, but because this string is so cumberson to work with it is easier to add it to the **input-vars.tf** file as a default clause:
+
+variable "master_ign_CA" {
+  description = "The Certificate Authority (CA) to be used by the master instances"
+  type = string
+  default = "data:text/plain;charset=utf-8;base64,LS0tLS1CRUdJTiBDRVJUSUZJQ0<long string of characters>=="
+}
 
 
 ## Deploying the infrastructure with terraform
@@ -162,7 +187,6 @@ This information can be obtained from the AWS web interface, and looks like this
 Hosted Zone ID: Z00659431CO1O47AE0285
 ```
 The ID will be used with the variable **dns_domain_ID**
-
 
 Review the rest of variable in the file input-vars.tf, then go to the Terraform directory and run a command like:
 

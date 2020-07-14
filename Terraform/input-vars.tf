@@ -77,16 +77,10 @@ variable "enable_proxy" {
   default = false
 }
 
-#variable "user-data-bootstrap" {
-#  description = "User data for bootstrap EC2 instance"
-#  type = string
-#  default = <<-EOF
-#    - {"ignition":{"config":{"replace":{"source":"s3://terraform-20200712093906961900000001/bootstrap.ign","verification":{}}},"timeouts":{},"version":"2.1.0"},"networkd":{},"passwd":{},"storage":{},"systemd":{}}
-#    - '{"ignition":{"config":{"replace":{"source":"${S3Loc}","verification":{}}},"timeouts":{},"version":"2.1.0"},"networkd":{},"passwd":{},"storage":{},"systemd":{}}'
-#    - {
-#      S3Loc: !Ref BootstrapIgnitionLocation
-#  EOF
-#}
+variable "master_ign_CA" {
+  description = "The Certificate Authority (CA) to be used by the master instances"
+  type = string
+}
 
 #LOCALS
 locals {
@@ -98,4 +92,8 @@ private_subnet_count = var.subnet_count > 0 && var.subnet_count <= 3 ? var.subne
 
 #If the proxy is enable, only 1 public subnet is created for the bastion, otherwise the same number as for the private subnets
 public_subnet_count = var.enable_proxy ? 1 : local.private_subnet_count
+
+#Domain name without the dot at the end
+dotless_domain = replace("${data.aws_route53_zone.domain.name}","/.$/","")
 }
+
