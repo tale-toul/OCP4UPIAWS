@@ -5,17 +5,6 @@ provider "aws" {
   shared_credentials_file = "aws-credentials.ini"
 }
 
-#This is only used to generate random values
-provider "random" {
-  version = "~> 2.3.0"
-}
-
-#Provides a source to create a short random string 
-resource "random_string" "sufix_name" {
-  length = 5
-  upper = false
-  special = false
-}
 
 #VPC
 resource "aws_vpc" "vpc" {
@@ -26,6 +15,7 @@ resource "aws_vpc" "vpc" {
     tags = {
         Name = var.vpc_name
         Clusterid = var.cluster_name
+        "kubernetes.io/cluster/${var.infra_name}" = "shared"
     }
 }
 
@@ -35,6 +25,7 @@ resource "aws_vpc_dhcp_options" "vpc-options" {
 
   tags = {
         Clusterid = var.cluster_name
+        "kubernetes.io/cluster/${var.infra_name}" = "shared"
   }
 }
 
@@ -53,8 +44,8 @@ resource "aws_subnet" "subnet_pub" {
     count = local.public_subnet_count
     vpc_id = aws_vpc.vpc.id
     availability_zone = data.aws_availability_zones.avb-zones.names[count.index]
-    #CIDR: 172.20.0.0/20; 172.20.16.0/20; 172.20.32.0/20; 
-    cidr_block = "172.20.${count.index * 16}.0/20"
+    #CIDR: <cidr fix part>.0.0/20; <cidr fix part>.16.0/20; <cidr fix part>.32.0/20; 
+    cidr_block = "${regex("^\\d+\\.\\d+\\.",var.vpc_cidr)}${count.index * 16}.0/20"
     map_public_ip_on_launch = true
 
     tags = {
@@ -69,8 +60,8 @@ resource "aws_subnet" "subnet_priv" {
   count = local.private_subnet_count 
   vpc_id = aws_vpc.vpc.id
   availability_zone = data.aws_availability_zones.avb-zones.names[count.index]
-  #CIDR: 172.20.128.0/20; 172.20.144.0/20; 172.20.160.0/20; 
-  cidr_block = "172.20.${(count.index + 8) * 16}.0/20"
+  #CIDR: <cidr fix part>.128.0/20; <cidr fix part>.144.0/20; <cidr fix part>.160.0/20; 
+  cidr_block = "${regex("\\d+\\.\\d+\\.",var.vpc_cidr)}${(count.index + 8) * 16}.0/20"
   map_public_ip_on_launch = false
 
   tags = {
@@ -90,6 +81,7 @@ resource "aws_vpc_endpoint" "s3" {
 
   tags = {
       Clusterid = var.cluster_name
+      "kubernetes.io/cluster/${var.infra_name}" = "shared"
   }
 }
 
@@ -134,6 +126,7 @@ resource "aws_internet_gateway" "intergw" {
     tags = {
         Name = "intergw"
         Clusterid = var.cluster_name
+        "kubernetes.io/cluster/${var.infra_name}" = "shared"
     }
 }
 
@@ -141,9 +134,11 @@ resource "aws_internet_gateway" "intergw" {
 resource "aws_eip" "nateip" {
   count = var.enable_proxy ? 0 : local.public_subnet_count
   vpc = true
+
   tags = {
       Name = "nateip.${count.index}"
       Clusterid = var.cluster_name
+      "kubernetes.io/cluster/${var.infra_name}" = "shared"
   }
 }
 
@@ -157,6 +152,7 @@ resource "aws_nat_gateway" "natgw" {
     tags = {
         Name = "natgw.${count.index}"
         Clusterid = var.cluster_name
+        "kubernetes.io/cluster/${var.infra_name}" = "shared"
     }
 }
 
@@ -172,6 +168,7 @@ resource "aws_route_table" "rtable_igw" {
     tags = {
         Name = "rtable_igw"
         Clusterid = var.cluster_name
+        "kubernetes.io/cluster/${var.infra_name}" = "shared"
     }
 }
 
@@ -190,6 +187,7 @@ resource "aws_route_table" "rtable_priv" {
     tags = {
         Name = "rtable_priv.${count.index}"
         Clusterid = var.cluster_name
+        "kubernetes.io/cluster/${var.infra_name}" = "shared"
     }
 }
 
@@ -218,6 +216,7 @@ resource "aws_lb" "ext_api_lb" {
 
   tags = {
     Clusterid = var.cluster_name
+    "kubernetes.io/cluster/${var.infra_name}" = "shared"
   }
 }
 
@@ -233,6 +232,7 @@ resource "aws_lb_target_group" "external_tg" {
 
   tags = {
     Clusterid = var.cluster_name
+    "kubernetes.io/cluster/${var.infra_name}" = "shared"
   }
 }
 
@@ -258,6 +258,7 @@ resource "aws_lb" "int_api_lb" {
 
   tags = {
     Clusterid = var.cluster_name
+    "kubernetes.io/cluster/${var.infra_name}" = "shared"
   }
 }
 
@@ -272,6 +273,7 @@ resource "aws_lb_target_group" "internal_tg" {
 
   tags = {
     Clusterid = var.cluster_name
+    "kubernetes.io/cluster/${var.infra_name}" = "shared"
   }
 }
 
@@ -298,6 +300,7 @@ resource "aws_lb_target_group" "internal_service_tg" {
 
   tags = {
     Clusterid = var.cluster_name
+    "kubernetes.io/cluster/${var.infra_name}" = "shared"
   }
 }
 
@@ -334,6 +337,7 @@ resource "aws_iam_role" "master-role" {
 EOF
   tags = {
     Clusterid = var.cluster_name
+    "kubernetes.io/cluster/${var.infra_name}" = "shared"
   }
 }
 
@@ -405,6 +409,7 @@ resource "aws_iam_role" "worker-role" {
 EOF
   tags = {
     Clusterid = var.cluster_name
+    "kubernetes.io/cluster/${var.infra_name}" = "shared"
   }
 }
 
@@ -456,6 +461,7 @@ resource "aws_iam_role" "bootstrap-role" {
 EOF
   tags = {
     Clusterid = var.cluster_name
+    "kubernetes.io/cluster/${var.infra_name}" = "shared"
   }
 }
 
@@ -518,6 +524,7 @@ resource "aws_security_group" "master-sg" {
     tags = {
         Name = "${var.infra_name}-master-sg"
         Clusterid = var.cluster_name
+        "kubernetes.io/cluster/${var.infra_name}" = "shared"
     }
 }
 
@@ -659,6 +666,7 @@ resource "aws_security_group" "worker-sg" {
     tags = {
         Name = "${var.infra_name}-worker-sg"
         Clusterid = var.cluster_name
+        "kubernetes.io/cluster/${var.infra_name}" = "shared"
     }
 }
 
@@ -781,9 +789,16 @@ resource "aws_security_group" "bootstrap-sg" {
         cidr_blocks = ["0.0.0.0/0"]
     }
 
+    egress {
+        from_port = 0 
+        to_port = 0
+        protocol = -1
+        cidr_blocks = ["0.0.0.0/0"]
+    }
     tags = {
         Name = "${var.infra_name}-bootstrap-sg"
         Clusterid = var.cluster_name
+        "kubernetes.io/cluster/${var.infra_name}" = "shared"
     }
 }
 
@@ -807,15 +822,6 @@ resource "aws_security_group_rule" "outbound-all-worker-sgr" {
   security_group_id = aws_security_group.worker-sg.id
 }
 
-resource "aws_security_group_rule" "outbound-all-bootstrap-sgr" {
-  type = "egress"
-  description = "Allow all outbound connections from bootstrap EC2s"
-  from_port = 0
-  to_port = 0
-  protocol = "-1"
-  cidr_blocks = ["0.0.0.0/0"]
-  security_group_id = aws_security_group.bootstrap-sg.id
-}
 
 ###EC2s
 #Bootstrap 
@@ -849,6 +855,7 @@ resource "aws_network_interface" "bootstrap-nic" {
 
   tags = {
         Clusterid = var.cluster_name
+        "kubernetes.io/cluster/${var.infra_name}" = "shared"
   }
 }
 
@@ -908,6 +915,7 @@ resource "aws_network_interface" "master-nic" {
 
   tags = {
         Clusterid = var.cluster_name
+        "kubernetes.io/cluster/${var.infra_name}" = "shared"
   }
 }
 
@@ -970,6 +978,7 @@ resource "aws_network_interface" "worker-nic" {
 
   tags = {
         Clusterid = var.cluster_name
+        "kubernetes.io/cluster/${var.infra_name}" = "shared"
   }
 }
 
@@ -1034,7 +1043,7 @@ resource "aws_route53_record" "api-internal-internal" {
 }
 
 #S3
-#S3 disk to store ignition config files
+#S3 disk to store the bootstrap ignition config file
 resource "aws_s3_bucket" "ignition-bucket" {
   bucket = "${var.infra_name }-ignition"
   region = var.region_name
@@ -1045,6 +1054,7 @@ resource "aws_s3_bucket" "ignition-bucket" {
   tags = {
     Name  = "${var.infra_name }-ignition"
     Clusterid = var.cluster_name
+    "kubernetes.io/cluster/${var.infra_name}" = "shared"
   }
 }
 

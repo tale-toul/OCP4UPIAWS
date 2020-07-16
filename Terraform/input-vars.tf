@@ -62,7 +62,7 @@ variable "rhcos-ami" {
 variable "vpc_cidr" {
   description = "Network segment for the VPC"
   type = string
-  default = "172.20.0.0/16"
+  default = "10.0.0.0/16"
 }
 
 variable "enable_proxy" {

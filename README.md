@@ -2,9 +2,14 @@
 
 ## Table of contents
 
+* [Introduction](#introduction)
+* [Requirements](#requirements)
+* [Installation instructions](#installation-instructions)
+* [Deploying the infrastructure with terraform](#deploying-the-infrastructure-with-terraform)
+
 ## Introduction
 
-This project contains the necesary elements to deploy an Openshift 4.4 cluster on AWS using the UPI installation method
+This project contains the necesary instructions to deploy an Openshift 4.4 cluster on AWS using the UPI installation method.
 
 ## Requirements
 
@@ -43,11 +48,16 @@ This project contains the necesary elements to deploy an Openshift 4.4 cluster o
 
 The installation steps follow the instructions provided at [Installing a cluster on user-provisioned infrastructure in AWS by using CloudFormation templates:](https://docs.openshift.com/container-platform/4.4/installing/installing_aws/installing-aws-user-infra.html), but instead of CloudFormation, Terraform is used to create the resources in AWS.
 
-1. [Download the installation program](https://cloud.redhat.com/openshift/install) for the AWS cloud provider
+1. [Download the installation program, pull secret and command line tools](https://cloud.redhat.com/openshift/install).- Select AWS as the infrastructure provider, then User-provided infrastructure. Download the installer and command line tools for operating system required.  Download the pull secret as a file for later use.  
 
-1. [Download the pull secret](https://cloud.redhat.com/openshift/install) from the same page as the installer.
+Uncompress the intall program and cli tools:
 
-1. [Create an ssh key pair](https://docs.openshift.com/container-platform/4.4/installing/installing_aws/installing-aws-user-infra.html#ssh-agent-using_installing-aws-user-infra).- This key will be installed on every node in the cluster and will allow pawordless connections to those machines.  This step is not extrictly required for twu reason: 
+```shell
+$ tar xvf openshift-install-linux.tar.gz
+$ sudo tar xvf openshift-client-linux.tar.gz  -C /usr/local/bin/
+```
+
+1. [Create an ssh key pair](https://docs.openshift.com/container-platform/4.4/installing/installing_aws/installing-aws-user-infra.html#ssh-agent-using_installing-aws-user-infra).- This key will be installed on the bootstrap and every instance in the cluster and will allow pawordless connections to those machines.  This step is not extrictly required for twu reason: 
 
   1. ssh connections to the cluster instances are not required, quite the contrary they are discourage, but it is a convenient tool in case issues come up during cluster installation.
 
@@ -67,16 +77,16 @@ $ cp upi-ssh* ~/.ssh
 
 The command will ask:
 
-* For the ssh keys that will be installed in the EC2 instances
+* The ssh keys that will be installed in the EC2 instances. Selected from those already in ~/.ssh
 * The platform provider, AWS in this case
 * The credentials of the AWS account to use to deploy the resources.  If the file ~/.aws/credentials exists and contains valid credentials, these will be used.
 * The AWS region where the cluster will be deployed
 * The base DNS domain to use for the cluster public URLs.  This domain must already exist and be managed by AWS.
 * A name for the cluster, used as the base for naming the resources, and will be added to the above DNS domain
-* The pull secret to download container images from Red Hat.  The pull secret is pasted on the console when the installer asks for it.
+* The pull secret to download container images from Red Hat.  Paste the contents of the pull-secret file downloaded before.
 
 ```shell
- $ $ ./openshift-install create install-config --dir clover
+ $ ./openshift-install create install-config --dir clover
 ? SSH Public Key /home/jjerezro/.ssh/upi-ssh.pub
 ? Platform aws
 INFO Credentials loaded from the "default" profile in file "/home/indalpa/.aws/credentials" 
@@ -94,7 +104,7 @@ INFO Credentials loaded from the "default" profile in file "/home/jjerezro/.aws/
 ```
 The previous command will create the directory _clover_ if it does not already exist, and will put the file **install-config.yaml** inside the directory.
 
-1. Edit the **install-config.yaml** file and set the number of worker replicas to 0.  Make any other changes to the file required for the installation:
+1. Edit the **install-config.yaml** file and set the number of compute (worker) replicas to 0.  Make any other changes to the file required for the installation, in the bellow example user defined tags have been added:
 
 ```yaml
 compute:
@@ -103,9 +113,16 @@ compute:
   name: worker
   platform: {}
   replicas: 0
+...
+platform:
+  aws:
+    region: eu-west-3
+    userTags:
+      Environment: UAT
+      Planet: Earth
 ```
 
-1. Make a backup copy of the **install-config.yaml** file, because it will be destroyed as part of the installation process:
+1. Make a backup copy of the **install-config.yaml** file outside the clover directory, because the file will be destroyed as part of the installation process:
 
 1. Create the Kubernetes manifests for the cluster
 
@@ -115,20 +132,22 @@ INFO Credentials loaded from the "default" profile in file "/home/jjerezro/.aws/
 INFO Consuming Install Config from target directory 
 WARNING Making control-plane schedulable by setting MastersSchedulable to true for Scheduler cluster settings
 ```
-1. Remove the Kubernetes manifest files that define the control plane and worker machines. By removing these files, you prevent the cluster from automatically generating these machines.
+The warning message will be dealt with in the next step.
 
-```shell
-$ rm clover/openshift/99_openshift-cluster-api_master-machines-*.yaml
-$ rm clover/openshift/99_openshift-cluster-api_worker-machineset-*.yaml
-```
-1. Edit the file **manifests/cluster-scheduler-02-config.yml**  and set the parameter **mastersSchedulable** to **false** to prevent pods from being scheduled on the master machines:
+1. Edit the file **manifests/cluster-scheduler-02-config.yml**  and set the parameter **mastersSchedulable** to **false** to prevent pods from being scheduled on the master nodes:
 
 ```yaml
 spec:
   mastersSchedulable: false
 ```
 
-1. Make sure that the tags section in the file **manifests/cluster-dns-02-config.yml** are the same that will later be used by terraform to create the infrastructure, and the public zone id is also the same that will be used by terraform.
+1. Remove the Kubernetes manifest files that define the control plane and worker machines. By removing these files, you prevent the cluster from automatically generating these machines.
+
+```shell
+$ rm clover/openshift/99_openshift-cluster-api_master-machines-*.yaml
+$ rm clover/openshift/99_openshift-cluster-api_worker-machineset-*.yaml
+```
+1. Get the value for the public zone id from the file **manifests/cluster-dns-02-config.yml** and save for later use.  Check that the base DNS domain (baseDomain) is the one selected to create the cluster public DNS names:
 
 ```yaml
 spec:
@@ -141,7 +160,7 @@ spec:
     id: Z00639231CO3O47AE0285
 ```
 
-1. Create the ignition files.  
+1. Create the ignition files.  This process will remove the manifest files:
 
 ```shell
 $ ./openshift-install create ignition-configs --dir clover
@@ -152,35 +171,11 @@ INFO Consuming Openshift Manifests from target directory
 INFO Consuming Common Manifests from target directory
 ```
 
-1. Get the infrastructure name assigned by the installer, this cosists of the clustername followed by a random short string.  This name will be used later as the base of other components names: 
-
-```shell
-$ cat clover/metadata.json |jq -r .infraID
-clover-ltwcq
-```
-
-The value returned must be used with the variable **infra_name** when running terraform
-
-1. Get the encoded certificate authority to be used by the master instances.  This is the long string located in the master ignition file **master.ign** and looks like this:
-
-`data:text/plain;charset=utf-8;base64,LS0tLS1CRUdJTiBDRVJUSUZJQ0<long string of characters>==`
-
-This long string must be assigned to the variable **master_ign_CA**, this could be done in the command line, but because this string is so cumberson to work with it is easier to add it to the **input-vars.tf** file as a default clause:
-
-variable "master_ign_CA" {
-  description = "The Certificate Authority (CA) to be used by the master instances"
-  type = string
-  default = "data:text/plain;charset=utf-8;base64,LS0tLS1CRUdJTiBDRVJUSUZJQ0<long string of characters>=="
-}
-
-
-## Deploying the infrastructure with terraform
-
-Terraform is used to create the infrastructure components of the VPC, some of these components can be adjusted via the use of variables defined in the file _Terrafomr/input-vars.tf_, like if a proxy is used to manage connections from the cluster to the Internet, the name of the cluster, the name of the DNS subdomain, etc.
-
 ### Terraform initialization
 
-After creating the first vesrion of the manifest files, for that run the following command in the directory where the manifest files are:
+Terraform is used to create the infrastructure components of the VPC, some of these components can be adjusted via the use of variables defined in the file _Terrafomr/input-vars.tf_, like the name of the cluster, the name of the DNS subdomain, etc.
+
+Before running terraform for the first time it needs to be initialized, run the following command in the directory where the terraform manifest files are located:
 
 ```shell
 # terraform init
@@ -188,7 +183,6 @@ Initializing the backend...
 
 Initializing provider plugins...
 - Checking for available provider plugins...
-- Downloading plugin for provider "random" (hashicorp/random) 2.3.0...
 - Downloading plugin for provider "aws" (hashicorp/aws) 2.69.0...
 
 Terraform has been successfully initialized!
@@ -196,35 +190,56 @@ Terraform has been successfully initialized!
 
 ### Creating the infrastructure
 
-Get the value for the variable **infra_name** as explained above:
+1. Get the infrastructure name assigned by the installer, this consists of the clustername followed by a random short string.  This name will be used later as the base of other component's names: 
 
 ```shell
 $ cat clover/metadata.json |jq -r .infraID
 clover-ltwcq
 ```
+The value returned must be used with the variable **infra_name** when running terraform
 
-Get the Hosted Zone ID for the Route53 zone that you will use as external public zone, and was specified in the intall-config.yaml file.  
-
-This information can be obtained from the AWS web interface, and looks like this example:
+1. Get the Hosted Zone ID that will be used as external public zone.  This information was saved in a previous step, if it is not available it can be obtained from the AWS web interface, going to the Route53 section and selecting the hosted zone:
 
 ```
-Hosted Zone ID: Z00659431CO1O47AE0285
+Hosted Zone ID: Z00369431CO8O17BE6289
 ```
+
 The ID will be used with the variable **dns_domain_ID**
 
-Define the variable **master_ign_CA** with the base64 definition of the CA certificate that will use master and nodes.
+1. Get the encoded certificate authority to be used by the master instances.  This is the long string located in the master ignition file **master.ign** and looks like this:
 
-Review the rest of variable in the file input-vars.tf, then go to the Terraform directory and run a command like:
+`data:text/plain;charset=utf-8;base64,LS0tLS1CRUdJTiBDRVJUSUZJQ0<...long string of characters..>==`
+
+This long string must be assigned to the variable **master_ign_CA**, this can be done in the command line. 
+
+1. Review the rest of the variables in the file input-vars.tf, in particular the region and cluster name must be the same that were used when creating the install-config.yaml file. Then go to the Terraform directory and run a command like the following:
 
 ```shell
-$ terraform apply -var="region_name=eu-west-3" -var="cluster_name=clover" -var="infra_name=clover-ltwcq" -var="dns_domain_ID=Z00659431CO1O47AE0285"
+$ terraform apply -var="region_name=eu-west-3" -var="cluster_name=clover" -var="infra_name=clover-ltwcq" -var="dns_domain_ID=Z00659431CO1O47AE0285" \
+  -var="master_ign_CA=data:text/plain;charset=utf-8;base64,LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1J....."
 ```
-When the infrastructure has been created, run the following command to check on the installationm process:
-```shell
-$ ./openshift-install wait-for bootstrap-complete --dir=clover --log-level=info
+Terraform analizes the information provided and asks for confirmation before proceding with the actual cration of resources:
+...
+Plan: 107 to add, 0 to change, 0 to destroy.
+
+Do you want to perform these actions?
+  Terraform will perform the actions described above.
+  Only 'yes' will be accepted to approve.
+
+  Enter a value:
 ```
 
-The log file for the installation may be usefull, it is located at **clover/.openshift_install.log**
+It will take a few minutes for Terraform to create all resources.  The resources will show up in the AWS web console as they are being created.
+
+When the infrastructure has been created, run the following command and wait for the message saying it is safe to remove the bootstrap resources.
+```shell
+$ ./openshift-install wait-for bootstrap-complete --dir brinx/ --log-level info
+INFO Waiting up to 20m0s for the Kubernetes API at https://api.brinx.tale.rhcee.support:6443... 
+INFO API v1.17.1+166b070 up                       
+INFO Waiting up to 40m0s for bootstrapping to complete... 
+INFO It is now safe to remove the bootstrap resources
+```
+The log file for the installation may be usefull in case of failure, it is located at **clover/.openshift_install.log**
 
 Another way to peek into the installation process is to ssh into the bootstrap instance and run the journalct command:
 
@@ -233,11 +248,146 @@ $ ssh-agent bash
 $ ssh-add ~/.ssh/upi-ssh
 $ ssh core@<IP of bootstrap instance>
 bootstrap $ journalctl -b -f -u bootkube.service
-
 ```
 
+When the bootstrap process is completed successfully the master nodes still need a few minutes to be ready.
 
-## User data for the instances
+Login to the cluster using the CLI by exporting the variable KUBECONFIG using the path to the file.  Using a relative path like in the following example will require to run the oc commands ffrom the same directory where the relative path is valid:
+
+```shell
+export KUBECONFIG=brinx/auth/kubeconfig
+```
+
+Run a test command to check is the cluster is ready:
+
+```shell
+$ oc whoami
+system:admin
+```
+If you get an error, wait a few minutes and try again
+
+On a new window run the following command to check on the completion of the installation.  This command is not strictly required, is just shows information about the installation process:
+
+```shell
+$ ./openshift-install wait-for install-complete --dir brinx/ --log-level info
+INFO Waiting up to 30m0s for the cluster at https://api.brinx.tale.rhcee.support:6443 to initialize...
+```
+
+Get the list of nodes, at this stage only master nodes should be available:
+
+```
+NAME                                         STATUS   ROLES    AGE   VERSION
+ip-10-0-139-182.eu-west-3.compute.internal   Ready    master   41m   v1.17.1+1aa1c48
+ip-10-0-156-148.eu-west-3.compute.internal   Ready    master   41m   v1.17.1+1aa1c48
+ip-10-0-165-4.eu-west-3.compute.internal     Ready    master   41m   v1.17.1+1aa1c48
+```
+For the worker nodes to be admited in the cluster, two certificate signing requests (csr) per worker node must be approved manually by the administrator.
+Get the list of csr's with the command:
+
+```shell
+$ oc get csr|grep Pending
+csr-dptjn   5m39s   system:serviceaccount:openshift-machine-config-operator:node-bootstrapper   Pending
+csr-h6r66   5m40s   system:serviceaccount:openshift-machine-config-operator:node-bootstrapper   Pending
+csr-xlmr2   5m38s   system:serviceaccount:openshift-machine-config-operator:node-bootstrapper   Pending
+```
+The list can be longer because the csr's have a short life span, a new ones get added every 15 minutes.
+Approve the 3 most recent csr's
+
+```shell
+$ oc adm certificate approve csr-dptjn csr-h6r66 csr-xlmr2
+certificatesigningrequest.certificates.k8s.io/csr-dptjn approved
+certificatesigningrequest.certificates.k8s.io/csr-h6r66 approved
+certificatesigningrequest.certificates.k8s.io/csr-xlmr2 approved
+```
+
+The approval of the above crs's will trigget the generation of 3 additional ones with a shorter name:
+
+```shell
+$ oc get csr|grep Pending
+csr-67f6q   53s   system:node:ip-10-0-166-103.eu-west-3.compute.internal                      Pending
+csr-flh5d   52s   system:node:ip-10-0-147-76.eu-west-3.compute.internal                       Pending
+csr-mlfn5   58s   system:node:ip-10-0-136-46.eu-west-3.compute.internal                       Pending
+```
+Again approve the 3 most recent ones:
+
+```shell
+$ oc adm certificate approve csr-67f6q csr-flh5d csr-mlfn5
+certificatesigningrequest.certificates.k8s.io/csr-67f6q approved
+certificatesigningrequest.certificates.k8s.io/csr-flh5d approved
+certificatesigningrequest.certificates.k8s.io/csr-mlfn5 approved
+```
+Now the worker nodes should appear in the list of cluster nodes:
+
+```shell
+$ oc get nodes
+NAME                                         STATUS   ROLES    AGE     VERSION
+ip-10-0-136-46.eu-west-3.compute.internal    Ready    worker   5m21s   v1.17.1+1aa1c48
+ip-10-0-139-182.eu-west-3.compute.internal   Ready    master   58m     v1.17.1+1aa1c48
+ip-10-0-147-76.eu-west-3.compute.internal    Ready    worker   5m16s   v1.17.1+1aa1c48
+ip-10-0-156-148.eu-west-3.compute.internal   Ready    master   59m     v1.17.1+1aa1c48
+ip-10-0-165-4.eu-west-3.compute.internal     Ready    master   58m     v1.17.1+1aa1c48
+ip-10-0-166-103.eu-west-3.compute.internal   Ready    worker   5m17s   v1.17.1+1aa1c48
+```
+The inclusion of the worker nodes will trigger the deployment of many of the services that run on worker nodes, check the status of the cluster operators until all of them are available, not progressing and not degraded:
+
+```shell
+$ oc get co
+NAME                                       VERSION   AVAILABLE   PROGRESSING   DEGRADED   SINCE
+authentication                             4.4.11    True        False         False      2m40s
+cloud-credential                           4.4.11    True        False         False      68m
+cluster-autoscaler                         4.4.11    True        False         False      55m
+console                                    4.4.11    True        False         False      5m42s
+csi-snapshot-controller                    4.4.11    True        False         False      9m4s
+dns                                        4.4.11    True        False         False      61m
+etcd                                       4.4.11    True        False         False      61m
+image-registry                             4.4.11    True        False         False      9m42s
+ingress                                    4.4.11    True        False         False      9m5s
+insights                                   4.4.11    True        False         False      55m
+kube-apiserver                             4.4.11    True        False         False      61m
+kube-controller-manager                    4.4.11    True        False         False      60m
+kube-scheduler                             4.4.11    True        False         False      59m
+kube-storage-version-migrator              4.4.11    True        False         False      9m19s
+machine-api                                4.4.11    True        False         False      55m
+machine-config                             4.4.11    True        False         False      62m
+marketplace                                4.4.11    True        False         False      55m
+monitoring                                 4.4.11    True        False         False      7m22s
+network                                    4.4.11    True        False         False      63m
+node-tuning                                4.4.11    True        False         False      63m
+openshift-apiserver                        4.4.11    True        False         False      55m
+openshift-controller-manager               4.4.11    True        False         False      55m
+openshift-samples                          4.4.11    True        False         False      54m
+operator-lifecycle-manager                 4.4.11    True        False         False      62m
+operator-lifecycle-manager-catalog         4.4.11    True        False         False      62m
+operator-lifecycle-manager-packageserver   4.4.11    True        False         False      56m
+service-ca                                 4.4.11    True        False         False      63m
+service-catalog-apiserver                  4.4.11    True        False         False      63m
+service-catalog-controller-manager         4.4.11    True        False         False      63m
+storage                                    4.4.11    True        False         False      55m
+```
+
+When all cluster operator are ready, the openshift-install command that had been run previously in another window should also finish successfully:
+
+```shell
+$ ./openshift-install wait-for install-complete --dir brinx/ --log-level info
+INFO Waiting up to 30m0s for the cluster at https://api.brinx.tale.rhcee.support:6443 to initialize... 
+INFO Waiting up to 10m0s for the openshift-console route to be created... 
+INFO Install complete!                            
+INFO To access the cluster as the system:admin user when using 'oc', run 'export KUBECONFIG=/home/brinx/auth/kubeconfig' 
+INFO Access the OpenShift web-console here: https://console-openshift-console.apps.brinx.example.com
+INFO Login to the console with user: kubeadmin, password: amDqg-bjVCH-TLBfQ-zdJnu
+```
+The cluster is now ready to be used.
+
+## Deleting the cluster
+
+$ ./openshift-install destroy cluster --dir brinx/ --log-level info
+
+$ terraform destroy -var="region_name=eu-west-3" -var="cluster_name=brinx" -var="infra_name=brinx-5wmhr" -var="master_ign_CA=a" 
+
+## Adding a machineconfig
+
+
+## User data for the EC2 instances
 
 Each of the EC2 instance definition for bootstrap, master and nodes need a user data block that will instruct the instance on where to get the ignition file required to do the initial set up of the instance.
 
@@ -256,6 +406,43 @@ It is import that the DNS record for **api-int** exists before creating the mast
 ```
   depends_on = [aws_route53_record.api-internal-internal]
 ```
+## CIDR definition 
+
+When the **install-config.yaml** file is created by the openshift-install program there is a default CIDR definition that represents the network address space that will be used for the machines created in the cluster:
+
+```yaml
+...
+networking:
+  machineNetwork:
+  - cidr: 10.0.0.0/16
+```
+
+This CIDR definition must match the **cidr_block** argument used to create the VPC in terraform, and the corresponding **cidr_block** definitions of each of the subnets created inside that VPC.  
+
+To simplify the configuration the variable **vpc_cidr** is used in terraform to hold the value of the CIDR, its default value matches the default value assigned by openshift-install when creating the install-config.yaml file:
+
+```yaml
+variable "vpc_cidr" {
+  description = "Network segment for the VPC"
+  type = string
+  default = "10.0.0.0/16"
+}
+```
+
+The subnets definition also uses the same variable **vpc_cidr** to compute the value for the CIDR assigned to it.  
+
+The subnets are created using a loop based on the variable **count** so that variable is used to assign the value of the third byte in the network definition `${count.index * 16}`.
+The first two bytes of the network definition is base on the **vpc_cidr**, a regular expression is used to extract the first two numbers followed by dots from the variable:  
+
+```yaml
+resource "aws_subnet" "subnet_pub" {
+    count = local.public_subnet_count
+    ...
+    #CIDR: <cidr fix part>.0.0/20; <cidr fix part>.16.0/20; <cidr fix part>.32.0/20; 
+    cidr_block = "${regex("^\\d+\\.\\d+\\.",var.vpc_cidr)}${count.index * 16}.0/20"
+...
+```
+For example for the default CIDR of 10.0.0.0/16, the first 3 subnets would be: 10.0.0.0/20; 10.0.16.0/20; 10.0.32.0/20.  The 10.0. part is extracted by the regular expression, the thir byte, 0, 16, 32 is computed by the expression `${count.index * 16}` and the finel 0/20 is constant.
 
 ## References
 
@@ -264,12 +451,7 @@ It is import that the DNS record for **api-int** exists before creating the mast
 
 ## Pending
 
-* The external DNS zone must exist prior to running terraform because it is required by the openshift installer program, therefore it cannot be created later by terraform.  It could be created by an idependent terraform module that is run before the openshift installer program though.
-
 * The bootstrap instance and related resources (S3 bucket for boostrap ignition file), creation should be done in an independent module, so they can be easily deleted after installation.
-
-* Add user defined tags to the install-config.yaml file
 
 * Define the instance type for master and workers in variables
 
-* Tag all resources created by terraform with kubernetes.io/cluster/....
