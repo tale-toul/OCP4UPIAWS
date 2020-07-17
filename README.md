@@ -5,7 +5,14 @@
 * [Introduction](#introduction)
 * [Requirements](#requirements)
 * [Installation instructions](#installation-instructions)
-* [Deploying the infrastructure with terraform](#deploying-the-infrastructure-with-terraform)
+* [Terraform initialization](#terraform-initialization)
+* [Creating the infrastructure](#creating-the-infrastructure)
+* [Deleting bootstrap resources](#deleting-bootstrap-resources)
+* [Deleting the cluster](#deleting-the-cluster)
+* [User data for the EC2 instances](#user-data-for-the-ec2-instances)
+* [CIDR definition](#cidr-definition)
+* [References](#references)
+* [Pending tasks](#pending-tasks)
 
 ## Introduction
 
@@ -178,7 +185,7 @@ Terraform is used to create the infrastructure components of the VPC, some of th
 Before running terraform for the first time it needs to be initialized, run the following command in the directory where the terraform manifest files are located:
 
 ```shell
-# terraform init
+ # terraform init
 Initializing the backend...
 
 Initializing provider plugins...
@@ -421,9 +428,6 @@ $ terraform destroy -var="region_name=eu-west-3" -var="cluster_name=brinx" -var=
 The above command will unlock the first command on the other terminal.  Finally all resources will get deleted.
 
 
-## Adding a machineconfig
-
-
 ## User data for the EC2 instances
 
 Each of the EC2 instance definition for bootstrap, master and nodes need a user data block that will instruct the instance on where to get the ignition file required to do the initial set up of the instance.
@@ -486,9 +490,11 @@ For example for the default CIDR of 10.0.0.0/16, the first 3 subnets would be: 1
 [0] [Installation and update](https://docs.openshift.com/container-platform/4.4/architecture/architecture-installation.html#architecture-installation)
 [1] [Installing a cluster on user-provisioned infrastructure in AWS by using CloudFormation templates:](https://docs.openshift.com/container-platform/4.4/installing/installing_aws/installing-aws-user-infra.html)
 
-## Pending
-
-* The bootstrap instance and related resources (S3 bucket for boostrap ignition file), creation should be done in an independent module, so they can be easily deleted after installation.
+## Pending tasks
 
 * Define the instance type for master and workers in variables
+
+* The cluster_name variable should be a terraform local computed from the infra_name var, so the user does not have add a redundant the value in the command line.
+
+* Explain how to assign variables from a file instead of the command line
 
