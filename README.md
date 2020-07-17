@@ -73,7 +73,7 @@ The previous command will produce two files: upi-ssh and upi-ssh.pub.  Copy them
 $ cp upi-ssh* ~/.ssh
 ```
 
-1. [Create the **install-config.yaml** file](https://docs.openshift.com/container-platform/4.4/installing/installing_aws/installing-aws-user-infra.html#installation-generate-aws-user-infra-install-config_installing-aws-user-infra).- This is the configuration file that will describe the cluster to be installed. The easiest way to create the file is by using the install program with the options **"create install-config"** and answer the questions asked.  The option **--dir** is followed by a directory name, it is best to use an empty directory or a non existing one to avoid conflic with any previous installation, if the directory does not exist the installation program will create it:
+1. [Create the **install-config.yaml** file](https://docs.openshift.com/container-platform/4.4/installing/installing_aws/installing-aws-user-infra.html#installation-generate-aws-user-infra-install-config_installing-aws-user-infra).- This is the configuration file that describes the cluster. The easiest way to create the file is by using the install program with the options **"create install-config"** and answer the questions asked.  The option **--dir** is followed by a directory name, it is best to use an empty directory or a non existing one to avoid conflic with any previous installation, if the directory does not exist the installation program will create it:
 
 The command will ask:
 
@@ -102,9 +102,9 @@ INFO Credentials loaded from the "default" profile in file "/home/jjerezro/.aws/
 ? Cluster Name clover
 ? Pull Secret [? for help] **************************************************************
 ```
-The previous command will create the directory _clover_ if it does not already exist, and will put the file **install-config.yaml** inside the directory.
+The previous command will create the directory _clover_, if it does not already exist, and the file **install-config.yaml** inside it.
 
-1. Edit the **install-config.yaml** file and set the number of compute (worker) replicas to 0.  Make any other changes to the file required for the installation, in the bellow example user defined tags have been added:
+1. Edit the **install-config.yaml** file and set the number of compute (worker) replicas to 0.  Make any other [changes](https://docs.openshift.com/container-platform/4.4/installing/installing_aws/installing-aws-customizations.html#installation-configuration-parameters_installing-aws-customizations) required for the installation, in the example bellow, the user defined tags have been added:
 
 ```yaml
 compute:
@@ -122,7 +122,7 @@ platform:
       Planet: Earth
 ```
 
-1. Make a backup copy of the **install-config.yaml** file outside the clover directory, because the file will be destroyed as part of the installation process:
+1. Backup the **install-config.yaml** file outside of the clover directory, because the file will be destroyed in the next step.
 
 1. Create the Kubernetes manifests for the cluster
 
@@ -218,7 +218,8 @@ This long string must be assigned to the variable **master_ign_CA**, this can be
 $ terraform apply -var="region_name=eu-west-3" -var="cluster_name=clover" -var="infra_name=clover-ltwcq" -var="dns_domain_ID=Z00659431CO1O47AE0285" \
   -var="master_ign_CA=data:text/plain;charset=utf-8;base64,LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1J....."
 ```
-Terraform analizes the information provided and asks for confirmation before proceding with the actual cration of resources:
+Terraform analizes the information provided and asks for confirmation before proceding with the actual creation of resources:
+```
 ...
 Plan: 107 to add, 0 to change, 0 to destroy.
 
@@ -250,9 +251,10 @@ $ ssh core@<IP of bootstrap instance>
 bootstrap $ journalctl -b -f -u bootkube.service
 ```
 
-When the bootstrap process is completed successfully the master nodes still need a few minutes to be ready.
+When the bootstrap process hass completed successfully with the message: `INFO It is now safe to remove the bootstrap resources`.  The master nodes still need a few minutes to be ready.
+Despite the message keep the bootstrap resources around until the end of the intallation, they are usefull for troubleshooting in case anything goes wrong.  Check the section [Deleting bootstrap resources](#deleting-bootstrap-resources) for instructions on how to remove those resources.
 
-Login to the cluster using the CLI by exporting the variable KUBECONFIG using the path to the file.  Using a relative path like in the following example will require to run the oc commands ffrom the same directory where the relative path is valid:
+Login to the cluster using the CLI by exporting the variable KUBECONFIG using the path to the file **kubeconfig** created by the openshift-install program.  Using a relative path like in the following example will require to run the oc commands ffrom the same directory where the relative path is valid:
 
 ```shell
 export KUBECONFIG=brinx/auth/kubeconfig
@@ -281,7 +283,7 @@ ip-10-0-139-182.eu-west-3.compute.internal   Ready    master   41m   v1.17.1+1aa
 ip-10-0-156-148.eu-west-3.compute.internal   Ready    master   41m   v1.17.1+1aa1c48
 ip-10-0-165-4.eu-west-3.compute.internal     Ready    master   41m   v1.17.1+1aa1c48
 ```
-For the worker nodes to be admited in the cluster, two certificate signing requests (csr) per worker node must be approved manually by the administrator.
+The worker nodes need to be admited in the cluster, two certificate signing requests (csr) per worker node must be approved manually by the administrator.
 Get the list of csr's with the command:
 
 ```shell
@@ -290,7 +292,7 @@ csr-dptjn   5m39s   system:serviceaccount:openshift-machine-config-operator:node
 csr-h6r66   5m40s   system:serviceaccount:openshift-machine-config-operator:node-bootstrapper   Pending
 csr-xlmr2   5m38s   system:serviceaccount:openshift-machine-config-operator:node-bootstrapper   Pending
 ```
-The list can be longer because the csr's have a short life span, a new ones get added every 15 minutes.
+The list can be longer because the csr's have a short life span, new ones get added every 15 minutes if the old ones have not been approved.
 Approve the 3 most recent csr's
 
 ```shell
@@ -378,11 +380,46 @@ INFO Login to the console with user: kubeadmin, password: amDqg-bjVCH-TLBfQ-zdJn
 ```
 The cluster is now ready to be used.
 
+Now the bootstrap resources can be deleted
+
+## Deleting bootstrap resources
+
+The boostrap EC2 instance and related resources were created by Terraform as an independent module.  This allows for the deletion of these resources without afecting the rest of resources.
+
+The terraform command to delete the resources requires the use of the **region_name** and **infra_name** variables, the **master_ign_CA** is also mandatory but is not used so any value can be assigned to it.  
+
+The command requires the use of the option `-target module.bootstrap` so terraform knows that only bootstrap reources must be deleted.  
+
+**WARNING** If the target option is not used, terraform will delete all resources, resulting in the destruction of the cluster.
+
+The following is an example command:
+```shell
+$ terraform destroy -var="region_name=eu-west-3" -var="infra_name=owl-wd4cq" -var="master_ign_CA=void" -target module.bootstrap
+```
+This command will show the following warning message that can be safely ignored:
+
+```
+Warning: Resource targeting is in effect
+```
+
 ## Deleting the cluster
 
-$ ./openshift-install destroy cluster --dir brinx/ --log-level info
+Part of the cluster resources were created using terraform, and part were created by Openshift itself.  To make sure all resources are deleted, both the openshift installer and terraform are used.  
 
+Two terminals are requied to follow this procedure:
+
+In one terminal run the following openshift-intall command, this will trigger the removal of part of the resources:
+
+```shell
+$ ./openshift-install destroy cluster --dir brinx/ --log-level info
+```
+Leave the above command running for a few minutes, at some point it will get stuck and will not go any further.  At that moment run the terraform destroy command in another terminal.
+The terraform destroy command requires the use of the variables: **region_name**, **cluster_name** and **infra_name**, the **master_ign_CA** is also mandatory but is not used so any value can be assigned to it. 
+```shell
 $ terraform destroy -var="region_name=eu-west-3" -var="cluster_name=brinx" -var="infra_name=brinx-5wmhr" -var="master_ign_CA=a" 
+```
+The above command will unlock the first command on the other terminal.  Finally all resources will get deleted.
+
 
 ## Adding a machineconfig
 
