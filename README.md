@@ -16,7 +16,7 @@
 
 ## Introduction
 
-This project contains the necesary instructions to deploy an Openshift 4.4 cluster on AWS using the UPI installation method.
+This project contains the necesary instructions to deploy an Openshift 4.4 public cluster on AWS using the UPI installation method.
 
 ## Requirements
 
@@ -141,7 +141,7 @@ WARNING Making control-plane schedulable by setting MastersSchedulable to true f
 ```
 The warning message will be dealt with in the next step.
 
-1. Edit the file **manifests/cluster-scheduler-02-config.yml**  and set the parameter **mastersSchedulable** to **false** to prevent pods from being scheduled on the master nodes:
+1. Edit the file **clover/manifests/cluster-scheduler-02-config.yml**  and set the parameter **mastersSchedulable** to _false_ to prevent pods from being scheduled on the master nodes:
 
 ```yaml
 spec:
@@ -154,7 +154,7 @@ spec:
 $ rm clover/openshift/99_openshift-cluster-api_master-machines-*.yaml
 $ rm clover/openshift/99_openshift-cluster-api_worker-machineset-*.yaml
 ```
-1. Get the value for the public zone id from the file **manifests/cluster-dns-02-config.yml** and save for later use.  Check that the base DNS domain (baseDomain) is the one selected to create the cluster public DNS names:
+1. Get the value for the public zone id from the file **clover/manifests/cluster-dns-02-config.yml** and save for later use.  Check that the base DNS domain (baseDomain) is the one selected to create the cluster public DNS names:
 
 ```yaml
 spec:
@@ -222,6 +222,7 @@ This long string must be assigned to the variable **master_ign_CA**, this can be
 1. Review the rest of the variables in the file input-vars.tf, in particular the region and cluster name must be the same that were used when creating the install-config.yaml file. Then go to the Terraform directory and run a command like the following:
 
 ```shell
+$ cd Terraform 
 $ terraform apply -var="region_name=eu-west-3" -var="cluster_name=clover" -var="infra_name=clover-ltwcq" -var="dns_domain_ID=Z00659431CO1O47AE0285" \
   -var="master_ign_CA=data:text/plain;charset=utf-8;base64,LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1J....."
 ```
@@ -239,7 +240,7 @@ Do you want to perform these actions?
 
 It will take a few minutes for Terraform to create all resources.  The resources will show up in the AWS web console as they are being created.
 
-When the infrastructure has been created, run the following command and wait for the message saying it is safe to remove the bootstrap resources.
+On another terminal run the following command to see how the installation is progressing, and wait for the message saying it is safe to remove the bootstrap resources.
 ```shell
 $ ./openshift-install wait-for bootstrap-complete --dir brinx/ --log-level info
 INFO Waiting up to 20m0s for the Kubernetes API at https://api.brinx.tale.rhcee.support:6443... 
@@ -385,9 +386,9 @@ INFO To access the cluster as the system:admin user when using 'oc', run 'export
 INFO Access the OpenShift web-console here: https://console-openshift-console.apps.brinx.example.com
 INFO Login to the console with user: kubeadmin, password: amDqg-bjVCH-TLBfQ-zdJnu
 ```
-The cluster is now ready to be used.
+The cluster is now installed and ready to be used.
 
-Now the bootstrap resources can be deleted
+The bootstrap resources can be deleted.
 
 ## Deleting bootstrap resources
 
@@ -411,14 +412,14 @@ Warning: Resource targeting is in effect
 
 ## Deleting the cluster
 
-Part of the cluster resources were created using terraform, and part were created by Openshift itself.  To make sure all resources are deleted, both the openshift installer and terraform are used.  
+Part of the cluster resources were created using terraform, and part were created by Openshift afterward.  To make sure all resources are deleted, both the openshift installer and terraform are used.  
 
 Two terminals are requied to follow this procedure:
 
 In one terminal run the following openshift-intall command, this will trigger the removal of part of the resources:
 
 ```shell
-$ ./openshift-install destroy cluster --dir brinx/ --log-level info
+$ ./openshift-install destroy cluster --dir brinx --log-level info
 ```
 Leave the above command running for a few minutes, at some point it will get stuck and will not go any further.  At that moment run the terraform destroy command in another terminal.
 The terraform destroy command requires the use of the variables: **region_name**, **cluster_name** and **infra_name**, the **master_ign_CA** is also mandatory but is not used so any value can be assigned to it. 
@@ -498,3 +499,6 @@ For example for the default CIDR of 10.0.0.0/16, the first 3 subnets would be: 1
 
 * Explain how to assign variables from a file instead of the command line
 
+* Allow the creation of a private (Internal) cluster
+
+* Use the infra_name in the subnet names
