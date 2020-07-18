@@ -19,6 +19,7 @@ module "bootstrap" {
   external_api_tg_arn = aws_lb_target_group.external_tg.arn
   internal_api_tg_arn = aws_lb_target_group.internal_tg.arn
   external_service_tg_arn = aws_lb_target_group.internal_service_tg.arn
+  bootstrap_inst_type = var.bootstrap_inst_type 
 }
 
 #VPC
@@ -28,7 +29,7 @@ resource "aws_vpc" "vpc" {
     enable_dns_support = true
 
     tags = {
-        Name = var.vpc_name
+        Name = "${var.infra_name}-vpc"
         Clusterid = var.cluster_name
         "kubernetes.io/cluster/${var.infra_name}" = "shared"
     }
@@ -64,7 +65,7 @@ resource "aws_subnet" "subnet_pub" {
     map_public_ip_on_launch = true
 
     tags = {
-        Name = "subnet_pub.${count.index}"
+        Name = "${var.infra_name}-subnet_pub.${count.index}"
         Clusterid = var.cluster_name
         "kubernetes.io/cluster/${var.infra_name}" = "shared"
     }
@@ -80,7 +81,7 @@ resource "aws_subnet" "subnet_priv" {
   map_public_ip_on_launch = false
 
   tags = {
-      Name = "subnet_priv.${count.index}"
+      Name = "${var.infra_name}-subnet_priv.${count.index}"
       Clusterid = var.cluster_name
       "kubernetes.io/cluster/${var.infra_name}" = "shared"
   }
@@ -139,7 +140,7 @@ resource "aws_internet_gateway" "intergw" {
     vpc_id = aws_vpc.vpc.id
 
     tags = {
-        Name = "intergw"
+        Name = "${var.infra_name}-intergw"
         Clusterid = var.cluster_name
         "kubernetes.io/cluster/${var.infra_name}" = "shared"
     }
@@ -151,7 +152,7 @@ resource "aws_eip" "nateip" {
   vpc = true
 
   tags = {
-      Name = "nateip.${count.index}"
+      Name = "${var.infra_name}-nateip.${count.index}"
       Clusterid = var.cluster_name
       "kubernetes.io/cluster/${var.infra_name}" = "shared"
   }
@@ -165,7 +166,7 @@ resource "aws_nat_gateway" "natgw" {
     depends_on = [aws_internet_gateway.intergw]
 
     tags = {
-        Name = "natgw.${count.index}"
+        Name = "${var.infra_name}-natgw.${count.index}"
         Clusterid = var.cluster_name
         "kubernetes.io/cluster/${var.infra_name}" = "shared"
     }
@@ -181,7 +182,7 @@ resource "aws_route_table" "rtable_igw" {
         gateway_id = aws_internet_gateway.intergw.id
     }
     tags = {
-        Name = "rtable_igw"
+        Name = "${var.infra_name}-rtable_igw"
         Clusterid = var.cluster_name
         "kubernetes.io/cluster/${var.infra_name}" = "shared"
     }
@@ -200,7 +201,7 @@ resource "aws_route_table" "rtable_priv" {
     vpc_id = aws_vpc.vpc.id
 
     tags = {
-        Name = "rtable_priv.${count.index}"
+        Name = "${var.infra_name}-rtable_priv.${count.index}"
         Clusterid = var.cluster_name
         "kubernetes.io/cluster/${var.infra_name}" = "shared"
     }
@@ -738,7 +739,7 @@ resource "aws_instance" "master-ec2" {
   depends_on = [aws_route53_record.api-internal-internal]
   ami = var.rhcos-ami[var.region_name]
   iam_instance_profile = aws_iam_instance_profile.master-profile.name
-  instance_type = "m5.xlarge"
+  instance_type = var.master_inst_type
 
   root_block_device {
       volume_size = 120
@@ -801,7 +802,7 @@ resource "aws_instance" "worker-ec2" {
   depends_on = [aws_instance.master-ec2]
   ami = var.rhcos-ami[var.region_name]
   iam_instance_profile = aws_iam_instance_profile.worker-profile.name
-  instance_type = "m5.large"
+  instance_type = var.worker_inst_type
 
   root_block_device {
       volume_size = 120

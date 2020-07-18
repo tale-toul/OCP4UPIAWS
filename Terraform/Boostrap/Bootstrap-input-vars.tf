@@ -50,3 +50,10 @@ variable "external_service_tg_arn" {
   description = "ARN of the target group for the external load balancer service listener"
   type = string
 }
+
+variable "bootstrap_inst_type" {
+  description = "EC2 instance type for bootstrap"
+  type = string
+  default = "m5.large"
+}
+

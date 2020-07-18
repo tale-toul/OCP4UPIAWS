@@ -111,7 +111,7 @@ resource "aws_security_group" "bootstrap-sg" {
 resource "aws_instance" "bootstrap-ec2" {
   ami = var.rhcos-ami
   iam_instance_profile = aws_iam_instance_profile.bootstrap-profile.name
-  instance_type = "m5.large"
+  instance_type = var.bootstrap_inst_type
   depends_on = [aws_s3_bucket.ignition-bucket]
   
   network_interface {

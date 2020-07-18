@@ -80,7 +80,7 @@ The previous command will produce two files: upi-ssh and upi-ssh.pub.  Copy them
 $ cp upi-ssh* ~/.ssh
 ```
 
-1. [Create the **install-config.yaml** file](https://docs.openshift.com/container-platform/4.4/installing/installing_aws/installing-aws-user-infra.html#installation-generate-aws-user-infra-install-config_installing-aws-user-infra).- This is the configuration file that describes the cluster. The easiest way to create the file is by using the install program with the options **"create install-config"** and answer the questions asked.  The option **--dir** is followed by a directory name, it is best to use an empty directory or a non existing one to avoid conflic with any previous installation, if the directory does not exist the installation program will create it:
+1. [Create the **install-config.yaml** file](https://docs.openshift.com/container-platform/4.4/installing/installing_aws/installing-aws-user-infra.html#installation-generate-aws-user-infra-install-config_installing-aws-user-infra).- This is the configuration file that describes the cluster. The easiest way to create the file is by using the openshift install program with the options **"create install-config"** and answer the questions asked.  The option **--dir** is followed by a directory name, it is best to use an empty directory or a non existing one to avoid conflic with any previous installation, if the directory does not exist the installation program will create it:
 
 The command will ask:
 
@@ -111,7 +111,7 @@ INFO Credentials loaded from the "default" profile in file "/home/jjerezro/.aws/
 ```
 The previous command will create the directory _clover_, if it does not already exist, and the file **install-config.yaml** inside it.
 
-1. Edit the **install-config.yaml** file and set the number of compute (worker) replicas to 0.  Make any other [changes](https://docs.openshift.com/container-platform/4.4/installing/installing_aws/installing-aws-customizations.html#installation-configuration-parameters_installing-aws-customizations) required for the installation, in the example bellow, the user defined tags have been added:
+1. Edit the **install-config.yaml** file and set the number of compute (worker) replicas to 0.  Make any other [changes](https://docs.openshift.com/container-platform/4.4/installing/installing_aws/installing-aws-customizations.html#installation-configuration-parameters_installing-aws-customizations) required for the installation, in the example bellow, user defined tags have been added:
 
 ```yaml
 compute:
@@ -151,10 +151,16 @@ spec:
 1. Remove the Kubernetes manifest files that define the control plane and worker machines. By removing these files, you prevent the cluster from automatically generating these machines.
 
 ```shell
-$ rm clover/openshift/99_openshift-cluster-api_master-machines-*.yaml
-$ rm clover/openshift/99_openshift-cluster-api_worker-machineset-*.yaml
+$ rm -v clover/openshift/99_openshift-cluster-api_master-machines-*.yaml
+$ rm -v clover/openshift/99_openshift-cluster-api_worker-machineset-*.yaml
 ```
-1. Get the value for the public zone id from the file **clover/manifests/cluster-dns-02-config.yml** and save for later use.  Check that the base DNS domain (baseDomain) is the one selected to create the cluster public DNS names:
+1. Create an empty file in the Terraform directory to store the variable assigments that will later be used by the terraform command to create the infraestructure.  The file does not need to have a specific name or extension, but if the extension is **.tfvars** it will be automatically loaded by terraform:
+
+```shell
+$ touch clover.vars
+```
+
+1. Get the value for the public zone id from the file **clover/manifests/cluster-dns-02-config.yml** and add an entry to the variable assigment file created before for the variable **dns_domain**. Check that the base DNS domain (baseDomain) is the one selected to create the cluster public DNS names:
 
 ```yaml
 spec:
@@ -165,6 +171,12 @@ spec:
       kubernetes.io/cluster/clover-qvml2: owned
   publicZone:
     id: Z00639231CO3O47AE0285
+```
+
+The contents of the clover.vars should look like:
+```
+ $ cat Terraform/clover.vars
+dns_domain_ID="Z00659431CO1O47AE0285"
 ```
 
 1. Create the ignition files.  This process will remove the manifest files:
@@ -197,35 +209,57 @@ Terraform has been successfully initialized!
 
 ### Creating the infrastructure
 
-1. Get the infrastructure name assigned by the installer, this consists of the clustername followed by a random short string.  This name will be used later as the base of other component's names: 
+1. Get the infrastructure name assigned by the installer, this consists of the clustername followed by a short random string.  This name will be used later as the base of other infrastructure component names: 
 
 ```shell
 $ cat clover/metadata.json |jq -r .infraID
 clover-ltwcq
 ```
-The value returned must be used with the variable **infra_name** when running terraform
+Add an entry to the variable assigment file created before for the variable **infra_name**:
 
-1. Get the Hosted Zone ID that will be used as external public zone.  This information was saved in a previous step, if it is not available it can be obtained from the AWS web interface, going to the Route53 section and selecting the hosted zone:
-
+```shell
+ $ cat Terraform/clover.vars
+dns_domain_ID="Z00659431CO1O47AE0285"
+infra_name = "clover-v5fgv"
 ```
-Hosted Zone ID: Z00369431CO8O17BE6289
-```
-
-The ID will be used with the variable **dns_domain_ID**
 
 1. Get the encoded certificate authority to be used by the master instances.  This is the long string located in the master ignition file **master.ign** and looks like this:
 
 `data:text/plain;charset=utf-8;base64,LS0tLS1CRUdJTiBDRVJUSUZJQ0<...long string of characters..>==`
 
-This long string must be assigned to the variable **master_ign_CA**, this can be done in the command line. 
-
-1. Review the rest of the variables in the file input-vars.tf, in particular the region and cluster name must be the same that were used when creating the install-config.yaml file. Then go to the Terraform directory and run a command like the following:
+This long string must be assigned to the variable **master_ign_CA** in the variables assigment file created before:
 
 ```shell
-$ cd Terraform 
+ $ cat Terraform/clover.vars
+dns_domain_ID="Z00659431CO1O47AE0285"
+infra_name = "clover-v5fgv"
+master_ign_CA = "data:text/plain;charset=utf-8;base64,LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0t........LS0tCk1JSS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg=="
+```
+
+1. Review the rest of the variables in the file input-vars.tf, in particular the region and cluster name must be the same that were used when creating the install-config.yaml file, and add any required variable definition to the variables assigment file: 
+
+```shell
+ $ cat Terraform/clover.vars
+dns_domain_ID="Z00659431CO1O47AE0285"
+infra_name = "clover-v5fgv"
+master_ign_CA = "data:text/plain;charset=utf-8;base64,LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0t........LS0tCk1JSS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg=="
+region_name = "eu-west-3"
+cluster_name = "clover"
+```
+
+Then go to the Terraform directory and run a command like the following:
+
+```shell
+ $ cd Terraform 
+ $ terraform apply -var-file clover.vars
+```
+Alternatively the variables can be assigned in the command line:
+
+```shell
 $ terraform apply -var="region_name=eu-west-3" -var="cluster_name=clover" -var="infra_name=clover-ltwcq" -var="dns_domain_ID=Z00659431CO1O47AE0285" \
   -var="master_ign_CA=data:text/plain;charset=utf-8;base64,LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1J....."
 ```
+
 Terraform analizes the information provided and asks for confirmation before proceding with the actual creation of resources:
 ```
 ...
@@ -259,7 +293,8 @@ $ ssh core@<IP of bootstrap instance>
 bootstrap $ journalctl -b -f -u bootkube.service
 ```
 
-When the bootstrap process hass completed successfully with the message: `INFO It is now safe to remove the bootstrap resources`.  The master nodes still need a few minutes to be ready.
+When the bootstrap process has completed successfully with the message: `INFO It is now safe to remove the bootstrap resources`.  The master nodes still need a few minutes to be ready.
+
 Despite the message keep the bootstrap resources around until the end of the intallation, they are usefull for troubleshooting in case anything goes wrong.  Check the section [Deleting bootstrap resources](#deleting-bootstrap-resources) for instructions on how to remove those resources.
 
 Login to the cluster using the CLI by exporting the variable KUBECONFIG using the path to the file **kubeconfig** created by the openshift-install program.  Using a relative path like in the following example will require to run the oc commands ffrom the same directory where the relative path is valid:
@@ -326,7 +361,7 @@ certificatesigningrequest.certificates.k8s.io/csr-67f6q approved
 certificatesigningrequest.certificates.k8s.io/csr-flh5d approved
 certificatesigningrequest.certificates.k8s.io/csr-mlfn5 approved
 ```
-Now the worker nodes should appear in the list of cluster nodes:
+Now the worker nodes should appear in the list of cluster nodes, although they may take a couple minutes reach the Ready status:
 
 ```shell
 $ oc get nodes
@@ -341,7 +376,7 @@ ip-10-0-166-103.eu-west-3.compute.internal   Ready    worker   5m17s   v1.17.1+1
 The inclusion of the worker nodes will trigger the deployment of many of the services that run on worker nodes, check the status of the cluster operators until all of them are available, not progressing and not degraded:
 
 ```shell
-$ oc get co
+$ watch oc get co
 NAME                                       VERSION   AVAILABLE   PROGRESSING   DEGRADED   SINCE
 authentication                             4.4.11    True        False         False      2m40s
 cloud-credential                           4.4.11    True        False         False      68m
@@ -392,9 +427,7 @@ The bootstrap resources can be deleted.
 
 ## Deleting bootstrap resources
 
-The boostrap EC2 instance and related resources were created by Terraform as an independent module.  This allows for the deletion of these resources without afecting the rest of resources.
-
-The terraform command to delete the resources requires the use of the **region_name** and **infra_name** variables, the **master_ign_CA** is also mandatory but is not used so any value can be assigned to it.  
+The boostrap EC2 instance and related resources were created by Terraform as an independent module.  This allows for the deletion of these without afecting  the rest of the resources.
 
 The command requires the use of the option `-target module.bootstrap` so terraform knows that only bootstrap reources must be deleted.  
 
@@ -402,7 +435,7 @@ The command requires the use of the option `-target module.bootstrap` so terrafo
 
 The following is an example command:
 ```shell
-$ terraform destroy -var="region_name=eu-west-3" -var="infra_name=owl-wd4cq" -var="master_ign_CA=void" -target module.bootstrap
+$ terraform destroy -var-file clover.vars -target module.bootstrap
 ```
 This command will show the following warning message that can be safely ignored:
 
@@ -493,12 +526,8 @@ For example for the default CIDR of 10.0.0.0/16, the first 3 subnets would be: 1
 
 ## Pending tasks
 
-* Define the instance type for master and workers in variables
-
 * The cluster_name variable should be a terraform local computed from the infra_name var, so the user does not have add a redundant the value in the command line.
-
-* Explain how to assign variables from a file instead of the command line
 
 * Allow the creation of a private (Internal) cluster
 
-* Use the infra_name in the subnet names
+* After installation worker nodes should be replaced with another set backed by machinesets

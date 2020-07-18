@@ -17,12 +17,6 @@ variable "infra_name" {
   description = "Unique string based on the cluster_name used to create the names of other some components" 
 }
 
-variable "vpc_name" {
-  description = "Name assigned to the VPC"
-  type = string
-  default = "volatil"
-}
-
 variable "subnet_count" {
   description = "Number of private and public subnets to a maximum of 3, there will be the same number of private and public subnets"
   type = number
@@ -74,6 +68,24 @@ variable "enable_proxy" {
 variable "master_ign_CA" {
   description = "The Certificate Authority (CA) to be used by the master instances"
   type = string
+}
+
+variable "master_inst_type" {
+  description = "EC2 instance type for masters"
+  type = string
+  default = "m5.xlarge"
+}
+
+variable "worker_inst_type" {
+  description = "EC2 instance type for workers"
+  type = string
+  default = "m5.large"
+}
+
+variable "bootstrap_inst_type" {
+  description = "EC2 instance type for bootstrap"
+  type = string
+  default = "m5.large"
 }
 
 #LOCALS
