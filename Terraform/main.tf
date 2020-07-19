@@ -10,7 +10,7 @@ module "bootstrap" {
   source = "./Boostrap"
 
   infra_name = var.infra_name
-  cluster_name = var.cluster_name
+  cluster_name = local.cluster_name
   region_name = var.region_name
   rhcos-ami = var.rhcos-ami[var.region_name]
   vpc_id = aws_vpc.vpc.id
@@ -30,7 +30,7 @@ resource "aws_vpc" "vpc" {
 
     tags = {
         Name = "${var.infra_name}-vpc"
-        Clusterid = var.cluster_name
+        Clusterid = local.cluster_name
         "kubernetes.io/cluster/${var.infra_name}" = "shared"
     }
 }
@@ -40,7 +40,8 @@ resource "aws_vpc_dhcp_options" "vpc-options" {
   domain_name_servers  = ["AmazonProvidedDNS"] 
 
   tags = {
-        Clusterid = var.cluster_name
+        Name = "${var.infra_name}-dhcp"
+        Clusterid = local.cluster_name
         "kubernetes.io/cluster/${var.infra_name}" = "shared"
   }
 }
@@ -66,7 +67,7 @@ resource "aws_subnet" "subnet_pub" {
 
     tags = {
         Name = "${var.infra_name}-subnet_pub.${count.index}"
-        Clusterid = var.cluster_name
+        Clusterid = local.cluster_name
         "kubernetes.io/cluster/${var.infra_name}" = "shared"
     }
 }
@@ -82,7 +83,7 @@ resource "aws_subnet" "subnet_priv" {
 
   tags = {
       Name = "${var.infra_name}-subnet_priv.${count.index}"
-      Clusterid = var.cluster_name
+      Clusterid = local.cluster_name
       "kubernetes.io/cluster/${var.infra_name}" = "shared"
   }
 }
@@ -96,7 +97,8 @@ resource "aws_vpc_endpoint" "s3" {
   vpc_endpoint_type = "Gateway"
 
   tags = {
-      Clusterid = var.cluster_name
+      Name = "${var.infra_name}-s3-endpoint"
+      Clusterid = local.cluster_name
       "kubernetes.io/cluster/${var.infra_name}" = "shared"
   }
 }
@@ -114,7 +116,7 @@ resource "aws_vpc_endpoint" "s3" {
 #                        aws_security_group.sg-web-in.id]
 #
 #  tags = {
-#      Clusterid = var.cluster_name
+#      Clusterid = local.cluster_name
 #  }
 #}
 
@@ -131,7 +133,7 @@ resource "aws_vpc_endpoint" "s3" {
 #                        aws_security_group.sg-web-in.id]
 #
 #  tags = {
-#      Clusterid = var.cluster_name
+#      Clusterid = local.cluster_name
 #  }
 #}
 
@@ -141,7 +143,7 @@ resource "aws_internet_gateway" "intergw" {
 
     tags = {
         Name = "${var.infra_name}-intergw"
-        Clusterid = var.cluster_name
+        Clusterid = local.cluster_name
         "kubernetes.io/cluster/${var.infra_name}" = "shared"
     }
 }
@@ -153,7 +155,7 @@ resource "aws_eip" "nateip" {
 
   tags = {
       Name = "${var.infra_name}-nateip.${count.index}"
-      Clusterid = var.cluster_name
+      Clusterid = local.cluster_name
       "kubernetes.io/cluster/${var.infra_name}" = "shared"
   }
 }
@@ -167,7 +169,7 @@ resource "aws_nat_gateway" "natgw" {
 
     tags = {
         Name = "${var.infra_name}-natgw.${count.index}"
-        Clusterid = var.cluster_name
+        Clusterid = local.cluster_name
         "kubernetes.io/cluster/${var.infra_name}" = "shared"
     }
 }
@@ -183,7 +185,7 @@ resource "aws_route_table" "rtable_igw" {
     }
     tags = {
         Name = "${var.infra_name}-rtable_igw"
-        Clusterid = var.cluster_name
+        Clusterid = local.cluster_name
         "kubernetes.io/cluster/${var.infra_name}" = "shared"
     }
 }
@@ -202,7 +204,7 @@ resource "aws_route_table" "rtable_priv" {
 
     tags = {
         Name = "${var.infra_name}-rtable_priv.${count.index}"
-        Clusterid = var.cluster_name
+        Clusterid = local.cluster_name
         "kubernetes.io/cluster/${var.infra_name}" = "shared"
     }
 }
@@ -231,7 +233,7 @@ resource "aws_lb" "ext_api_lb" {
   ip_address_type = "ipv4"
 
   tags = {
-    Clusterid = var.cluster_name
+    Clusterid = local.cluster_name
     "kubernetes.io/cluster/${var.infra_name}" = "shared"
   }
 }
@@ -247,7 +249,7 @@ resource "aws_lb_target_group" "external_tg" {
   deregistration_delay = 60
 
   tags = {
-    Clusterid = var.cluster_name
+    Clusterid = local.cluster_name
     "kubernetes.io/cluster/${var.infra_name}" = "shared"
   }
 }
@@ -273,7 +275,7 @@ resource "aws_lb" "int_api_lb" {
   ip_address_type = "ipv4"
 
   tags = {
-    Clusterid = var.cluster_name
+    Clusterid = local.cluster_name
     "kubernetes.io/cluster/${var.infra_name}" = "shared"
   }
 }
@@ -288,7 +290,7 @@ resource "aws_lb_target_group" "internal_tg" {
   deregistration_delay = 60
 
   tags = {
-    Clusterid = var.cluster_name
+    Clusterid = local.cluster_name
     "kubernetes.io/cluster/${var.infra_name}" = "shared"
   }
 }
@@ -315,7 +317,7 @@ resource "aws_lb_target_group" "internal_service_tg" {
   deregistration_delay = 60
 
   tags = {
-    Clusterid = var.cluster_name
+    Clusterid = local.cluster_name
     "kubernetes.io/cluster/${var.infra_name}" = "shared"
   }
 }
@@ -352,7 +354,7 @@ resource "aws_iam_role" "master-role" {
 }
 EOF
   tags = {
-    Clusterid = var.cluster_name
+    Clusterid = local.cluster_name
     "kubernetes.io/cluster/${var.infra_name}" = "shared"
   }
 }
@@ -424,7 +426,7 @@ resource "aws_iam_role" "worker-role" {
 }
 EOF
   tags = {
-    Clusterid = var.cluster_name
+    Clusterid = local.cluster_name
     "kubernetes.io/cluster/${var.infra_name}" = "shared"
   }
 }
@@ -465,7 +467,7 @@ resource "aws_security_group" "master-sg" {
 
     tags = {
         Name = "${var.infra_name}-master-sg"
-        Clusterid = var.cluster_name
+        Clusterid = local.cluster_name
         "kubernetes.io/cluster/${var.infra_name}" = "shared"
     }
 }
@@ -607,7 +609,7 @@ resource "aws_security_group" "worker-sg" {
 
     tags = {
         Name = "${var.infra_name}-worker-sg"
-        Clusterid = var.cluster_name
+        Clusterid = local.cluster_name
         "kubernetes.io/cluster/${var.infra_name}" = "shared"
     }
 }
@@ -753,12 +755,12 @@ resource "aws_instance" "master-ec2" {
   }
 
   user_data = <<-EOF
-    {"ignition":{"config":{"append":[{"source":"https://api-int.${var.cluster_name}.${local.dotless_domain}:22623/config/master","verification":{}}]},"security":{"tls":{"certificateAuthorities":[{"source":"${var.master_ign_CA}","verification":{}}]}},"timeouts":{},"version":"2.2.0"},"networkd":{},"passwd":{},"storage":{},"systemd":{}}
+    {"ignition":{"config":{"append":[{"source":"https://api-int.${local.cluster_name}.${local.dotless_domain}:22623/config/master","verification":{}}]},"security":{"tls":{"certificateAuthorities":[{"source":"${var.master_ign_CA}","verification":{}}]}},"timeouts":{},"version":"2.2.0"},"networkd":{},"passwd":{},"storage":{},"systemd":{}}
   EOF
 
   tags = {
         Name = "master-${var.infra_name}.${count.index}"
-        Clusterid = var.cluster_name
+        Clusterid = local.cluster_name
         "kubernetes.io/cluster/${var.infra_name}" = "shared"
   }
 }
@@ -770,7 +772,8 @@ resource "aws_network_interface" "master-nic" {
   subnet_id = aws_subnet.subnet_priv[count.index].id
 
   tags = {
-        Clusterid = var.cluster_name
+        Name = "${var.infra_name}-nic-master${count.index}"
+        Clusterid = local.cluster_name
         "kubernetes.io/cluster/${var.infra_name}" = "shared"
   }
 }
@@ -816,12 +819,12 @@ resource "aws_instance" "worker-ec2" {
   }
 
   user_data = <<-EOF
-    {"ignition":{"config":{"append":[{"source":"https://api-int.${var.cluster_name}.${local.dotless_domain}:22623/config/worker","verification":{}}]},"security":{"tls":{"certificateAuthorities":[{"source":"${var.master_ign_CA}","verification":{}}]}},"timeouts":{},"version":"2.2.0"},"networkd":{},"passwd":{},"storage":{},"systemd":{}}
+    {"ignition":{"config":{"append":[{"source":"https://api-int.${local.cluster_name}.${local.dotless_domain}:22623/config/worker","verification":{}}]},"security":{"tls":{"certificateAuthorities":[{"source":"${var.master_ign_CA}","verification":{}}]}},"timeouts":{},"version":"2.2.0"},"networkd":{},"passwd":{},"storage":{},"systemd":{}}
   EOF
 
   tags = {
         Name = "worker-${var.infra_name}.${count.index}"
-        Clusterid = var.cluster_name
+        Clusterid = local.cluster_name
         "kubernetes.io/cluster/${var.infra_name}" = "shared"
   }
 }
@@ -833,7 +836,8 @@ resource "aws_network_interface" "worker-nic" {
   subnet_id = aws_subnet.subnet_priv[count.index].id
 
   tags = {
-        Clusterid = var.cluster_name
+        Name = "${var.infra_name}-nic-worker${count.index}"
+        Clusterid = local.cluster_name
         "kubernetes.io/cluster/${var.infra_name}" = "shared"
   }
 }
@@ -847,7 +851,7 @@ data "aws_route53_zone" "domain" {
 #External API DNS record
 resource "aws_route53_record" "api-external" {
     zone_id = var.dns_domain_ID
-    name = "api.${var.cluster_name}"
+    name = "api.${local.cluster_name}"
     type = "A"
 
     alias {
@@ -859,7 +863,7 @@ resource "aws_route53_record" "api-external" {
 
 #Internal hosted zone, this is private because it is associated with a VPC.
 resource "aws_route53_zone" "internal" {
-  name = "${var.cluster_name}.${data.aws_route53_zone.domain.name}"
+  name = "${local.cluster_name}.${data.aws_route53_zone.domain.name}"
 
   vpc {
     vpc_id = aws_vpc.vpc.id
@@ -867,7 +871,7 @@ resource "aws_route53_zone" "internal" {
 
   tags = {
     Name = "${var.infra_name}-int"
-    Clusterid = var.cluster_name
+    Clusterid = local.cluster_name
     "kubernetes.io/cluster/${var.infra_name}" = "owned"
   }
 }
@@ -905,7 +909,7 @@ output "api_extenal_name" {
   description = "DNS name for the API entry point"
 }
 output "cluster_name" {
- value = var.cluster_name
+ value = local.cluster_name
  description = "Cluser name, used for prefixing some component names like the DNS domain"
 }
 output "region_name" {

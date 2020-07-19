@@ -5,12 +5,6 @@ variable "region_name" {
   default = "eu-west-1"
 }
 
-variable "cluster_name" {
-  description = "Cluster name, used to define Clusterid tag and as part of other component names"
-  type = string
-  default = "ocp"
-}
-
 #infra_name has no default value, see README.md to know how to get its value
 variable "infra_name" {
   type = string
@@ -90,9 +84,6 @@ variable "bootstrap_inst_type" {
 
 #LOCALS
 locals {
-##If enable_proxy is true, the security group sg-squid is added to the list, and later applied to bastion
-#bastion_security_groups = var.enable_proxy ? concat([aws_security_group.sg-ssh-in.id, aws_security_group.sg-all-out.id], aws_security_group.sg-squid[*].id) : [aws_security_group.sg-ssh-in.id, aws_security_group.sg-all-out.id]
-
 #The number of private subnets must be between 1 and 3, default is 1
 private_subnet_count = var.subnet_count > 0 && var.subnet_count <= 3 ? var.subnet_count : 1
 
@@ -101,5 +92,11 @@ public_subnet_count = var.enable_proxy ? 1 : local.private_subnet_count
 
 #Domain name without the dot at the end
 dotless_domain = replace("${data.aws_route53_zone.domain.name}","/.$/","")
+
+#Cluster name derived from infra_name
+#The regular expression contains two parantheses groups, so it will return a list with two values.  The first value contains the cluster name, that is why the index [0] is assigned to the variable.
+#The first parentheses group (^[-0-9A-Za-z]+) selects the longest string possible containing dashes (-), numbers and lower case letters. Uppercase letters are not allowed for the cluster name, but dashes are.
+#The second parentheses group will match a string starting with a dash and any letter or number, this second part is never used.
+cluster_name = regex("(^[-0-9a-z]+)(-\\w+)", var.infra_name)[0]
 }
 

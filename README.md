@@ -16,7 +16,9 @@
 
 ## Introduction
 
-This project contains the necesary instructions to deploy an Openshift 4.4 public cluster on AWS using the UPI installation method.
+This project contains the necesary instructions to deploy an Openshift 4 public cluster on AWS using the UPI installation method.
+
+The procedura has been tested on Openshift 4.4, but should also work in 4.5
 
 ## Requirements
 
@@ -80,7 +82,9 @@ The previous command will produce two files: upi-ssh and upi-ssh.pub.  Copy them
 $ cp upi-ssh* ~/.ssh
 ```
 
-1. [Create the **install-config.yaml** file](https://docs.openshift.com/container-platform/4.4/installing/installing_aws/installing-aws-user-infra.html#installation-generate-aws-user-infra-install-config_installing-aws-user-infra).- This is the configuration file that describes the cluster. The easiest way to create the file is by using the openshift install program with the options **"create install-config"** and answer the questions asked.  The option **--dir** is followed by a directory name, it is best to use an empty directory or a non existing one to avoid conflic with any previous installation, if the directory does not exist the installation program will create it:
+1. [Create the **install-config.yaml** file](https://docs.openshift.com/container-platform/4.4/installing/installing_aws/installing-aws-user-infra.html#installation-generate-aws-user-infra-install-config_installing-aws-user-infra).- This is the configuration file that describes the cluster. The easiest way to create the file is by using the openshift install program with the options **"create install-config"** and answer the questions asked.  
+
+The option **--dir** is followed by a directory name, the terraform manifests expect the name of the directory and the name of the cluster to be the same, otherwise the creation of the AWS resources will fail.  It is best to use an empty directory or a non existing one to avoid conflic with any previous installation, if the directory does not exist the installation program will create it:
 
 The command will ask:
 
@@ -147,7 +151,6 @@ The warning message will be dealt with in the next step.
 spec:
   mastersSchedulable: false
 ```
-
 1. Remove the Kubernetes manifest files that define the control plane and worker machines. By removing these files, you prevent the cluster from automatically generating these machines.
 
 ```shell
@@ -157,7 +160,7 @@ $ rm -v clover/openshift/99_openshift-cluster-api_worker-machineset-*.yaml
 1. Create an empty file in the Terraform directory to store the variable assigments that will later be used by the terraform command to create the infraestructure.  The file does not need to have a specific name or extension, but if the extension is **.tfvars** it will be automatically loaded by terraform:
 
 ```shell
-$ touch clover.vars
+$ touch Terraform/clover.vars
 ```
 
 1. Get the value for the public zone id from the file **clover/manifests/cluster-dns-02-config.yml** and add an entry to the variable assigment file created before for the variable **dns_domain**. Check that the base DNS domain (baseDomain) is the one selected to create the cluster public DNS names:
@@ -178,7 +181,6 @@ The contents of the clover.vars should look like:
  $ cat Terraform/clover.vars
 dns_domain_ID="Z00659431CO1O47AE0285"
 ```
-
 1. Create the ignition files.  This process will remove the manifest files:
 
 ```shell
@@ -215,14 +217,13 @@ Terraform has been successfully initialized!
 $ cat clover/metadata.json |jq -r .infraID
 clover-ltwcq
 ```
-Add an entry to the variable assigment file created before for the variable **infra_name**:
+1. Add an entry to the variable assigment file created before for the variable **infra_name**:
 
 ```shell
  $ cat Terraform/clover.vars
 dns_domain_ID="Z00659431CO1O47AE0285"
 infra_name = "clover-v5fgv"
 ```
-
 1. Get the encoded certificate authority to be used by the master instances.  This is the long string located in the master ignition file **master.ign** and looks like this:
 
 `data:text/plain;charset=utf-8;base64,LS0tLS1CRUdJTiBDRVJUSUZJQ0<...long string of characters..>==`
@@ -235,7 +236,6 @@ dns_domain_ID="Z00659431CO1O47AE0285"
 infra_name = "clover-v5fgv"
 master_ign_CA = "data:text/plain;charset=utf-8;base64,LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0t........LS0tCk1JSS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg=="
 ```
-
 1. Review the rest of the variables in the file input-vars.tf, in particular the region and cluster name must be the same that were used when creating the install-config.yaml file, and add any required variable definition to the variables assigment file: 
 
 ```shell
@@ -244,10 +244,8 @@ dns_domain_ID="Z00659431CO1O47AE0285"
 infra_name = "clover-v5fgv"
 master_ign_CA = "data:text/plain;charset=utf-8;base64,LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0t........LS0tCk1JSS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg=="
 region_name = "eu-west-3"
-cluster_name = "clover"
 ```
-
-Then go to the Terraform directory and run a command like the following:
+1. Go to the Terraform directory and run a command like the following:
 
 ```shell
  $ cd Terraform 
@@ -256,7 +254,7 @@ Then go to the Terraform directory and run a command like the following:
 Alternatively the variables can be assigned in the command line:
 
 ```shell
-$ terraform apply -var="region_name=eu-west-3" -var="cluster_name=clover" -var="infra_name=clover-ltwcq" -var="dns_domain_ID=Z00659431CO1O47AE0285" \
+$ terraform apply -var="region_name=eu-west-3" -var="infra_name=clover-ltwcq" -var="dns_domain_ID=Z00659431CO1O47AE0285" \
   -var="master_ign_CA=data:text/plain;charset=utf-8;base64,LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1J....."
 ```
 
@@ -364,7 +362,7 @@ certificatesigningrequest.certificates.k8s.io/csr-mlfn5 approved
 Now the worker nodes should appear in the list of cluster nodes, although they may take a couple minutes reach the Ready status:
 
 ```shell
-$ oc get nodes
+$ watch oc get nodes
 NAME                                         STATUS   ROLES    AGE     VERSION
 ip-10-0-136-46.eu-west-3.compute.internal    Ready    worker   5m21s   v1.17.1+1aa1c48
 ip-10-0-139-182.eu-west-3.compute.internal   Ready    master   58m     v1.17.1+1aa1c48
@@ -455,9 +453,8 @@ In one terminal run the following openshift-intall command, this will trigger th
 $ ./openshift-install destroy cluster --dir brinx --log-level info
 ```
 Leave the above command running for a few minutes, at some point it will get stuck and will not go any further.  At that moment run the terraform destroy command in another terminal.
-The terraform destroy command requires the use of the variables: **region_name**, **cluster_name** and **infra_name**, the **master_ign_CA** is also mandatory but is not used so any value can be assigned to it. 
 ```shell
-$ terraform destroy -var="region_name=eu-west-3" -var="cluster_name=brinx" -var="infra_name=brinx-5wmhr" -var="master_ign_CA=a" 
+$ terraform destroy -var-file clover.vars
 ```
 The above command will unlock the first command on the other terminal.  Finally all resources will get deleted.
 
@@ -525,8 +522,6 @@ For example for the default CIDR of 10.0.0.0/16, the first 3 subnets would be: 1
 [1] [Installing a cluster on user-provisioned infrastructure in AWS by using CloudFormation templates:](https://docs.openshift.com/container-platform/4.4/installing/installing_aws/installing-aws-user-infra.html)
 
 ## Pending tasks
-
-* The cluster_name variable should be a terraform local computed from the infra_name var, so the user does not have add a redundant the value in the command line.
 
 * Allow the creation of a private (Internal) cluster
 
