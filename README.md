@@ -70,9 +70,9 @@ The installation steps follow the instructions provided at [Installing a cluster
 
 1. [Create an ssh key pair](https://docs.openshift.com/container-platform/4.4/installing/installing_aws/installing-aws-user-infra.html#ssh-agent-using_installing-aws-user-infra).- This key will be installed on the bootstrap and every instance in the cluster and will allow pawordless connections to those machines.  This step is not extrictly required for twu reason: 
 
-  1. ssh connections to the cluster instances are not required, quite the contrary they are discourage, but it is a convenient tool in case issues come up during cluster installation.
+   1. ssh connections to the cluster instances are not required, quite the contrary they are discourage, but it is a convenient tool in case issues come up during cluster installation.
 
-  1. An already existinig ssh key pair can be used, as long as it is present in the direcotry ~/.ssh
+   1. An already existinig ssh key pair can be used, as long as it is present in the direcotry ~/.ssh
 
 ```shell
  $ ssh-keygen -o -t rsa -f upi-ssh -N "" -b 4096
