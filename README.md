@@ -8,7 +8,7 @@
   * [Ignition files creation](#ignition-files-creation)
   * [Terraform initialization](#terraform-initialization)
   * [Creating the infrastructure](#creating-the-infrastructure)
-  * [Openshift components completion](#openshift-components-completion)
+  * [Openshift install completion](#openshift-install-completion)
 * [Deleting bootstrap resources](#deleting-bootstrap-resources)
 * [Deleting the cluster](#deleting-the-cluster)
 * [User data for the EC2 instances](#user-data-for-the-ec2-instances)
@@ -213,69 +213,69 @@ Initializing provider plugins...
 Terraform has been successfully initialized!
 ```
 
-### Creating the infrastructure in AWS
+### Creating the infrastructure on AWS
 
 1. Get the infrastructure name assigned by the installer, this consists of the clustername followed by a short random string.  This name will be used later as the base of other infrastructure component names: 
 
-```shell
-$ cat clover/metadata.json |jq -r .infraID
-clover-ltwcq
-```
+   ```shell
+   $ cat clover/metadata.json |jq -r .infraID
+   clover-ltwcq
+   ```
 1. Add an entry to the variable assigment file created before for the variable **infra_name**:
 
-```shell
- $ cat Terraform/clover.vars
-dns_domain_ID="Z00659431CO1O47AE0285"
-infra_name = "clover-v5fgv"
-```
+   ```shell
+    $ cat Terraform/clover.vars
+   dns_domain_ID="Z00659431CO1O47AE0285"
+   infra_name = "clover-v5fgv"
+   ```
 1. Get the encoded certificate authority to be used by the master instances.  This is the long string located in the master ignition file **master.ign** and looks like this:
 
-`data:text/plain;charset=utf-8;base64,LS0tLS1CRUdJTiBDRVJUSUZJQ0<...long string of characters..>==`
+   `data:text/plain;charset=utf-8;base64,LS0tLS1CRUdJTiBDRVJUSUZJQ0<...long string of characters..>==`
 
-This long string must be assigned to the variable **master_ign_CA** in the variables assigment file created before:
+   This long string must be assigned to the variable **master_ign_CA** in the variables assigment file created before:
 
-```shell
- $ cat Terraform/clover.vars
-dns_domain_ID="Z00659431CO1O47AE0285"
-infra_name = "clover-v5fgv"
-master_ign_CA = "data:text/plain;charset=utf-8;base64,LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0t........LS0tCk1JSS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg=="
-```
+   ```shell
+    $ cat Terraform/clover.vars
+   dns_domain_ID="Z00659431CO1O47AE0285"
+   infra_name = "clover-v5fgv"
+   master_ign_CA = "data:text/plain;charset=utf-8;base64,LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0t........LS0tCk1JSS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg=="
+   ```
 1. Review the rest of the variables in the file input-vars.tf, in particular the region and cluster name must be the same that were used when creating the install-config.yaml file, and add any required variable definition to the variables assigment file: 
 
-```shell
- $ cat Terraform/clover.vars
-dns_domain_ID="Z00659431CO1O47AE0285"
-infra_name = "clover-v5fgv"
-master_ign_CA = "data:text/plain;charset=utf-8;base64,LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0t........LS0tCk1JSS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg=="
-region_name = "eu-west-3"
-```
+   ```shell
+    $ cat Terraform/clover.vars
+   dns_domain_ID="Z00659431CO1O47AE0285"
+   infra_name = "clover-v5fgv"
+   master_ign_CA = "data:text/plain;charset=utf-8;base64,LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0t........LS0tCk1JSS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg=="
+   region_name = "eu-west-3"
+   ```
 1. Go to the Terraform directory and run a command like the following:
 
-```shell
- $ cd Terraform 
- $ terraform apply -var-file clover.vars
-```
-Alternatively the variables can be assigned in the command line:
+   ```shell
+    $ cd Terraform 
+    $ terraform apply -var-file clover.vars
+   ```
+   Alternatively the variables can be assigned in the command line:
+   
+   ```shell
+   $ terraform apply -var="region_name=eu-west-3" -var="infra_name=clover-ltwcq" -var="dns_domain_ID=Z00659431CO1O47AE0285" \
+     -var="master_ign_CA=data:text/plain;charset=utf-8;base64,LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1J....."
+   ```
+   
+   Terraform analizes the information provided and asks for confirmation before proceding with the actual creation of resources:
+   ```
+   ...
+   Plan: 107 to add, 0 to change, 0 to destroy.
+   
+   Do you want to perform these actions?
+     Terraform will perform the actions described above.
+     Only 'yes' will be accepted to approve.
+   
+     Enter a value:
+   ```
+   It will take a few minutes for Terraform to create all resources.  The resources will show up in the AWS web console as they are being created.
 
-```shell
-$ terraform apply -var="region_name=eu-west-3" -var="infra_name=clover-ltwcq" -var="dns_domain_ID=Z00659431CO1O47AE0285" \
-  -var="master_ign_CA=data:text/plain;charset=utf-8;base64,LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1J....."
-```
-
-Terraform analizes the information provided and asks for confirmation before proceding with the actual creation of resources:
-```
-...
-Plan: 107 to add, 0 to change, 0 to destroy.
-
-Do you want to perform these actions?
-  Terraform will perform the actions described above.
-  Only 'yes' will be accepted to approve.
-
-  Enter a value:
-```
-It will take a few minutes for Terraform to create all resources.  The resources will show up in the AWS web console as they are being created.
-
-### Openshift components completion
+### Openshift install completion
 
 On another terminal run the following command to see how the installation is progressing, and wait for the message saying it is safe to remove the bootstrap resources.
 ```shell
