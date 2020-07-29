@@ -5,8 +5,8 @@
 * [Introduction](#introduction)
 * [Requirements](#requirements)
 * [Installation instructions](#installation-instructions)
-* [Terraform initialization](#terraform-initialization)
-* [Creating the infrastructure](#creating-the-infrastructure)
+  * [Terraform initialization](#terraform-initialization)
+  * [Creating the infrastructure](#creating-the-infrastructure)
 * [Deleting bootstrap resources](#deleting-bootstrap-resources)
 * [Deleting the cluster](#deleting-the-cluster)
 * [User data for the EC2 instances](#user-data-for-the-ec2-instances)
@@ -59,12 +59,12 @@ The installation steps follow the instructions provided at [Installing a cluster
 
 1. [Download the installation program, pull secret and command line tools](https://cloud.redhat.com/openshift/install).- Select AWS as the infrastructure provider, then User-provided infrastructure. Download the installer and command line tools for operating system required.  Download the pull secret as a file for later use.  
 
-Uncompress the intall program and cli tools:
+  Uncompress the intall program and cli tools:
 
-```shell
-$ tar xvf openshift-install-linux.tar.gz
-$ sudo tar xvf openshift-client-linux.tar.gz  -C /usr/local/bin/
-```
+  ```shell
+  $ tar xvf openshift-install-linux.tar.gz
+  $ sudo tar xvf openshift-client-linux.tar.gz  -C /usr/local/bin/
+  ```
 
 1. [Create an ssh key pair](https://docs.openshift.com/container-platform/4.4/installing/installing_aws/installing-aws-user-infra.html#ssh-agent-using_installing-aws-user-infra).- This key will be installed on the bootstrap and every instance in the cluster and will allow pawordless connections to those machines.  This step is not extrictly required for twu reason: 
 
@@ -151,7 +151,7 @@ The warning message will be dealt with in the next step.
 spec:
   mastersSchedulable: false
 ```
-1. Remove the Kubernetes manifest files that define the control plane and worker machines. By removing these files, you prevent the cluster from automatically generating these machines.
+1. Remove the Kubernetes manifest files that define the control plane and worker machines as machines and machinesets objects respectively.  These definitions need to be deleted because when masters and workers are added to the cluster the machineset-api cluster operator is not available.
 
 ```shell
 $ rm -v clover/openshift/99_openshift-cluster-api_master-machines-*.yaml
