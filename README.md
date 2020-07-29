@@ -1,12 +1,14 @@
-# UPI instalation on AWS
+# Openshift UPI instalation on AWS
 
 ## Table of contents
 
 * [Introduction](#introduction)
 * [Requirements](#requirements)
 * [Installation instructions](#installation-instructions)
+  * [Ignition files creation](#ignition-files-creation)
   * [Terraform initialization](#terraform-initialization)
   * [Creating the infrastructure](#creating-the-infrastructure)
+  * [Openshift components completion](#openshift-components-completion)
 * [Deleting bootstrap resources](#deleting-bootstrap-resources)
 * [Deleting the cluster](#deleting-the-cluster)
 * [User data for the EC2 instances](#user-data-for-the-ec2-instances)
@@ -59,12 +61,12 @@ The installation steps follow the instructions provided at [Installing a cluster
 
 1. [Download the installation program, pull secret and command line tools](https://cloud.redhat.com/openshift/install).- Select AWS as the infrastructure provider, then User-provided infrastructure. Download the installer and command line tools for operating system required.  Download the pull secret as a file for later use.  
 
-  Uncompress the intall program and cli tools:
+   Uncompress the intall program and cli tools:
 
-  ```shell
-  $ tar xvf openshift-install-linux.tar.gz
-  $ sudo tar xvf openshift-client-linux.tar.gz  -C /usr/local/bin/
-  ```
+   ```shell
+   $ tar xvf openshift-install-linux.tar.gz
+   $ sudo tar xvf openshift-client-linux.tar.gz  -C /usr/local/bin/
+   ```
 
 1. [Create an ssh key pair](https://docs.openshift.com/container-platform/4.4/installing/installing_aws/installing-aws-user-infra.html#ssh-agent-using_installing-aws-user-infra).- This key will be installed on the bootstrap and every instance in the cluster and will allow pawordless connections to those machines.  This step is not extrictly required for twu reason: 
 
@@ -81,6 +83,8 @@ The previous command will produce two files: upi-ssh and upi-ssh.pub.  Copy them
 ```shell
 $ cp upi-ssh* ~/.ssh
 ```
+
+### Ignition files creation
 
 1. [Create the **install-config.yaml** file](https://docs.openshift.com/container-platform/4.4/installing/installing_aws/installing-aws-user-infra.html#installation-generate-aws-user-infra-install-config_installing-aws-user-infra).- This is the configuration file that describes the cluster. The easiest way to create the file is by using the openshift install program with the options **"create install-config"** and answer the questions asked.  
 
@@ -209,7 +213,7 @@ Initializing provider plugins...
 Terraform has been successfully initialized!
 ```
 
-### Creating the infrastructure
+### Creating the infrastructure in AWS
 
 1. Get the infrastructure name assigned by the installer, this consists of the clustername followed by a short random string.  This name will be used later as the base of other infrastructure component names: 
 
@@ -269,8 +273,9 @@ Do you want to perform these actions?
 
   Enter a value:
 ```
-
 It will take a few minutes for Terraform to create all resources.  The resources will show up in the AWS web console as they are being created.
+
+### Openshift components completion
 
 On another terminal run the following command to see how the installation is progressing, and wait for the message saying it is safe to remove the bootstrap resources.
 ```shell
