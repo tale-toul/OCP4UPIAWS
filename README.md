@@ -88,113 +88,113 @@ $ cp upi-ssh* ~/.ssh
 
 1. [Create the **install-config.yaml** file](https://docs.openshift.com/container-platform/4.4/installing/installing_aws/installing-aws-user-infra.html#installation-generate-aws-user-infra-install-config_installing-aws-user-infra).- This is the configuration file that describes the cluster. The easiest way to create the file is by using the openshift install program with the options **"create install-config"** and answer the questions asked.  
 
-The option **--dir** is followed by a directory name, the terraform manifests expect the name of the directory and the name of the cluster to be the same, otherwise the creation of the AWS resources will fail.  It is best to use an empty directory or a non existing one to avoid conflic with any previous installation, if the directory does not exist the installation program will create it:
+   The option **--dir** is followed by a directory name, the terraform manifests expect the name of the directory and the name of the cluster to be the same, otherwise the creation of the AWS resources will fail.  It is best to use an empty directory or a non existing one to avoid conflic with any previous installation, if the directory does not exist the installation program will create it:
 
-The command will ask:
+   The command will ask:
 
-* The ssh keys that will be installed in the EC2 instances. Selected from those already in ~/.ssh
-* The platform provider, AWS in this case
-* The credentials of the AWS account to use to deploy the resources.  If the file ~/.aws/credentials exists and contains valid credentials, these will be used.
-* The AWS region where the cluster will be deployed
-* The base DNS domain to use for the cluster public URLs.  This domain must already exist and be managed by AWS.
-* A name for the cluster, used as the base for naming the resources, and will be added to the above DNS domain
-* The pull secret to download container images from Red Hat.  Paste the contents of the pull-secret file downloaded before.
-
-```shell
- $ ./openshift-install create install-config --dir clover
-? SSH Public Key /home/jjerezro/.ssh/upi-ssh.pub
-? Platform aws
-INFO Credentials loaded from the "default" profile in file "/home/indalpa/.aws/credentials" 
-? Region eu-west-3
-? Base Domain lili  [Use arrows to move, enter to select, type to filter, ? for more help]
-FATAL failed to fetch Install Config: failed to fetch dependency of "Install Config": failed to generate asset "Base Domain": failed UserInput for base domain: interrupt 
-[jjerezro@jjerezro OCP4AWSUPI]$ ./openshift-install create install-config --dir clover
-? SSH Public Key /home/jjerezro/.ssh/upi-ssh.pub
-? Platform aws
-INFO Credentials loaded from the "default" profile in file "/home/jjerezro/.aws/credentials" 
-? Region eu-west-3
-? Base Domain tale.rhcee.support
-? Cluster Name clover
-? Pull Secret [? for help] **************************************************************
-```
-The previous command will create the directory _clover_, if it does not already exist, and the file **install-config.yaml** inside it.
+   * The ssh keys that will be installed in the EC2 instances. Selected from those already in ~/.ssh
+   * The platform provider, AWS in this case
+   * The credentials of the AWS account to use to deploy the resources.  If the file ~/.aws/credentials exists and contains valid credentials, these will be used.
+   * The AWS region where the cluster will be deployed
+   * The base DNS domain to use for the cluster public URLs.  This domain must already exist and be managed by AWS.
+   * A name for the cluster, used as the base for naming the resources, and will be added to the above DNS domain
+   * The pull secret to download container images from Red Hat.  Paste the contents of the pull-secret file downloaded before.
+   
+   ```shell
+    $ ./openshift-install create install-config --dir clover
+   ? SSH Public Key /home/jjerezro/.ssh/upi-ssh.pub
+   ? Platform aws
+   INFO Credentials loaded from the "default" profile in file "/home/indalpa/.aws/credentials" 
+   ? Region eu-west-3
+   ? Base Domain lili  [Use arrows to move, enter to select, type to filter, ? for more help]
+   FATAL failed to fetch Install Config: failed to fetch dependency of "Install Config": failed to generate asset "Base Domain": failed UserInput for base domain: interrupt 
+   [jjerezro@jjerezro OCP4AWSUPI]$ ./openshift-install create install-config --dir clover
+   ? SSH Public Key /home/jjerezro/.ssh/upi-ssh.pub
+   ? Platform aws
+   INFO Credentials loaded from the "default" profile in file "/home/jjerezro/.aws/credentials" 
+   ? Region eu-west-3
+   ? Base Domain tale.rhcee.support
+   ? Cluster Name clover
+   ? Pull Secret [? for help] **************************************************************
+   ```
+   The previous command will create the directory _clover_, if it does not already exist, and the file **install-config.yaml** inside it.
 
 1. Edit the **install-config.yaml** file and set the number of compute (worker) replicas to 0.  Make any other [changes](https://docs.openshift.com/container-platform/4.4/installing/installing_aws/installing-aws-customizations.html#installation-configuration-parameters_installing-aws-customizations) required for the installation, in the example bellow, user defined tags have been added:
 
-```yaml
-compute:
-- architecture: amd64
-  hyperthreading: Enabled
-  name: worker
-  platform: {}
-  replicas: 0
-...
-platform:
-  aws:
-    region: eu-west-3
-    userTags:
-      Environment: UAT
-      Planet: Earth
-```
+   ```yaml
+   compute:
+   - architecture: amd64
+     hyperthreading: Enabled
+     name: worker
+     platform: {}
+     replicas: 0
+   ...
+   platform:
+     aws:
+       region: eu-west-3
+       userTags:
+         Environment: UAT
+         Planet: Earth
+   ```
 
 1. Backup the **install-config.yaml** file outside of the clover directory, because the file will be destroyed in the next step.
 
 1. Create the Kubernetes manifests for the cluster
 
-```shell
- $ ./openshift-install create manifests --dir clover
-INFO Credentials loaded from the "default" profile in file "/home/jjerezro/.aws/credentials" 
-INFO Consuming Install Config from target directory 
-WARNING Making control-plane schedulable by setting MastersSchedulable to true for Scheduler cluster settings
-```
-The warning message will be dealt with in the next step.
+   ```shell
+    $ ./openshift-install create manifests --dir clover
+   INFO Credentials loaded from the "default" profile in file "/home/jjerezro/.aws/credentials" 
+   INFO Consuming Install Config from target directory 
+   WARNING Making control-plane schedulable by setting MastersSchedulable to true for Scheduler cluster settings
+   ```
+   The warning message will be dealt with in the next step.
 
 1. Edit the file **clover/manifests/cluster-scheduler-02-config.yml**  and set the parameter **mastersSchedulable** to _false_ to prevent pods from being scheduled on the master nodes:
 
-```yaml
-spec:
-  mastersSchedulable: false
-```
+   ```yaml
+   spec:
+     mastersSchedulable: false
+   ```
 1. Remove the Kubernetes manifest files that define the control plane and worker machines as machines and machinesets objects respectively.  These definitions need to be deleted because when masters and workers are added to the cluster the machineset-api cluster operator is not available.
 
-```shell
-$ rm -v clover/openshift/99_openshift-cluster-api_master-machines-*.yaml
-$ rm -v clover/openshift/99_openshift-cluster-api_worker-machineset-*.yaml
-```
+   ```shell
+   $ rm -v clover/openshift/99_openshift-cluster-api_master-machines-*.yaml
+   $ rm -v clover/openshift/99_openshift-cluster-api_worker-machineset-*.yaml
+   ```
 1. Create an empty file in the Terraform directory to store the variable assigments that will later be used by the terraform command to create the infraestructure.  The file does not need to have a specific name or extension, but if the extension is **.tfvars** it will be automatically loaded by terraform:
 
-```shell
-$ touch Terraform/clover.vars
-```
+   ```shell
+   $ touch Terraform/clover.vars
+   ```
 
 1. Get the value for the public zone id from the file **clover/manifests/cluster-dns-02-config.yml** and add an entry to the variable assigment file created before for the variable **dns_domain**. Check that the base DNS domain (baseDomain) is the one selected to create the cluster public DNS names:
 
-```yaml
-spec:
-  baseDomain: clover.tale.rhcee.support
-  privateZone:
-    tags:
-      Name: clover-qvml2-int
-      kubernetes.io/cluster/clover-qvml2: owned
-  publicZone:
-    id: Z00639231CO3O47AE0285
-```
-
-The contents of the clover.vars should look like:
-```
- $ cat Terraform/clover.vars
-dns_domain_ID="Z00659431CO1O47AE0285"
-```
+   ```yaml
+   spec:
+     baseDomain: clover.tale.rhcee.support
+     privateZone:
+       tags:
+         Name: clover-qvml2-int
+         kubernetes.io/cluster/clover-qvml2: owned
+     publicZone:
+       id: Z00639231CO3O47AE0285
+   ```
+   
+   The contents of the clover.vars should look like:
+   ```
+    $ cat Terraform/clover.vars
+   dns_domain_ID="Z00659431CO1O47AE0285"
+   ```
 1. Create the ignition files.  This process will remove the manifest files:
 
-```shell
-$ ./openshift-install create ignition-configs --dir clover
-INFO Consuming OpenShift Install (Manifests) from target directory 
-INFO Consuming Master Machines from target directory 
-INFO Consuming Worker Machines from target directory 
-INFO Consuming Openshift Manifests from target directory 
-INFO Consuming Common Manifests from target directory
-```
+   ```shell
+   $ ./openshift-install create ignition-configs --dir clover
+   INFO Consuming OpenShift Install (Manifests) from target directory 
+   INFO Consuming Master Machines from target directory 
+   INFO Consuming Worker Machines from target directory 
+   INFO Consuming Openshift Manifests from target directory 
+   INFO Consuming Common Manifests from target directory
+   ```
 
 ### Terraform initialization
 
