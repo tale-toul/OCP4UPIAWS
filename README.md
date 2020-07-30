@@ -324,6 +324,7 @@ INFO Waiting up to 30m0s for the cluster at https://api.brinx.tale.rhcee.support
 Get the list of nodes, at this stage only master nodes should be available:
 
 ```
+$ oc get nodes
 NAME                                         STATUS   ROLES    AGE   VERSION
 ip-10-0-139-182.eu-west-3.compute.internal   Ready    master   41m   v1.17.1+1aa1c48
 ip-10-0-156-148.eu-west-3.compute.internal   Ready    master   41m   v1.17.1+1aa1c48
