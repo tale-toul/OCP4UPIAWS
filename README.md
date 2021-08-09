@@ -290,10 +290,8 @@ The log file for the installation may be usefull in case of failure, it is locat
 Another way to peek into the installation process is to ssh into the bootstrap instance and run the journalct command:
 
 ```shell
-$ ssh-agent bash
-$ ssh-add ~/.ssh/upi-ssh
 $ ssh core@<IP of bootstrap instance>
-bootstrap $ journalctl -b -f -u bootkube.service
+bootstrap $ journalctl -b -f
 ```
 
 When the bootstrap process has completed successfully with the message: `INFO It is now safe to remove the bootstrap resources`.  The master nodes still need a few minutes to be ready.

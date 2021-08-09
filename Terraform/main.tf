@@ -1,7 +1,6 @@
 #PROVIDERS
 provider "aws" {
   region = var.region_name
-  version = "~> 2.69.0"
   shared_credentials_file = "aws-credentials.ini"
 }
 
