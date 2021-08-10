@@ -120,7 +120,7 @@ resource "aws_instance" "bootstrap-ec2" {
   }
 
   user_data = <<-EOF
-    {"ignition":{"config":{"replace":{"source":"s3://${aws_s3_bucket.ignition-bucket.id}/bootstrap.ign","verification":{}}},"timeouts":{},"version":"2.1.0"},"networkd":{},"passwd":{},"storage":{},"systemd":{}}
+    {"ignition":{"config":{"replace":{"source":"s3://${aws_s3_bucket.ignition-bucket.id}/bootstrap.ign"}},"version":"3.1.0"}}
   EOF
 
   tags = {

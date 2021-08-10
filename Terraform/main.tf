@@ -891,7 +891,7 @@ resource "aws_instance" "master-ec2" {
   }
 
   user_data = <<-EOF
-    {"ignition":{"config":{"append":[{"source":"https://api-int.${local.cluster_name}.${local.dotless_domain}:22623/config/master","verification":{}}]},"security":{"tls":{"certificateAuthorities":[{"source":"${var.master_ign_CA}","verification":{}}]}},"timeouts":{},"version":"2.2.0"},"networkd":{},"passwd":{},"storage":{},"systemd":{}}
+    {"ignition":{"config":{"merge":[{"source":"https://api-int.${local.cluster_name}.${local.dotless_domain}:22623/config/master","verification":{}}]},"security":{"tls":{"certificateAuthorities":[{"source":"${var.master_ign_CA}"}]}},"version":"3.1.0"}}
   EOF
 
   tags = {
@@ -955,7 +955,7 @@ resource "aws_instance" "worker-ec2" {
   }
 
   user_data = <<-EOF
-    {"ignition":{"config":{"append":[{"source":"https://api-int.${local.cluster_name}.${local.dotless_domain}:22623/config/worker","verification":{}}]},"security":{"tls":{"certificateAuthorities":[{"source":"${var.master_ign_CA}","verification":{}}]}},"timeouts":{},"version":"2.2.0"},"networkd":{},"passwd":{},"storage":{},"systemd":{}}
+    {"ignition":{"config":{"merge":[{"source":"https://api-int.${local.cluster_name}.${local.dotless_domain}:22623/config/worker"}]},"security":{"tls":{"certificateAuthorities":[{"source":"${var.master_ign_CA}"}]}},"version":"3.1.0"}}
   EOF
 
   tags = {
