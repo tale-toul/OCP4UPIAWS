@@ -577,6 +577,66 @@ resource "aws_security_group_rule" "geneve-master-self" {
   self = true
 }
 
+resource "aws_security_group_rule" "ipsec-ike-self" {
+  type = "ingress"
+  description = "IPsec IKE packets"
+  from_port = 500
+  to_port = 500
+  protocol = "udp"
+  security_group_id = aws_security_group.master-sg.id
+  self = true
+}
+
+resource "aws_security_group_rule" "ipsec-ike-master" {
+  type = "ingress"
+  description = "IPsec IKE packets"
+  from_port = 500
+  to_port = 500
+  protocol = "udp"
+  security_group_id = aws_security_group.master-sg.id
+  source_security_group_id = aws_security_group.worker-sg.id
+}
+
+resource "aws_security_group_rule" "ipsec-natt-self" {
+  type = "ingress"
+  description = "IPsec NAT-T packets"
+  from_port = 4500
+  to_port = 4500
+  protocol = "udp"
+  security_group_id = aws_security_group.master-sg.id
+  self = true
+}
+
+resource "aws_security_group_rule" "ipsec-natt-master" {
+  type = "ingress"
+  description = "IPsec NAT-T packets"
+  from_port = 4500
+  to_port = 4500
+  protocol = "udp"
+  security_group_id = aws_security_group.master-sg.id
+  source_security_group_id = aws_security_group.worker-sg.id
+}
+
+resource "aws_security_group_rule" "ipsec-isp-self" {
+  type = "ingress"
+  description = "IPsec ESP packets"
+  from_port = 0
+  to_port = 65535
+  protocol = 50
+  security_group_id = aws_security_group.master-sg.id
+  self = true
+}
+
+resource "aws_security_group_rule" "ipsec-isp-master" {
+  type = "ingress"
+  description = "IPsec ESP packets"
+  from_port = 0
+  to_port = 65535
+  protocol = 50
+  security_group_id = aws_security_group.master-sg.id
+  source_security_group_id = aws_security_group.worker-sg.id
+}
+
 resource "aws_security_group_rule" "internal-master" {
   type = "ingress"
   description = "Internal cluster communication"
@@ -747,6 +807,66 @@ resource "aws_security_group_rule" "geneve-worker-self" {
   protocol = "udp"
   security_group_id = aws_security_group.worker-sg.id
   self = true
+}
+
+resource "aws_security_group_rule" "ipsec-ike-workerself" {
+  type = "ingress"
+  description = "IPsec IKE packets"
+  from_port = 500
+  to_port = 500
+  protocol = "udp"
+  security_group_id = aws_security_group.worker-sg.id
+  self = true
+}
+
+resource "aws_security_group_rule" "ipsec-ike-worker" {
+  type = "ingress"
+  description = "IPsec IKE packets"
+  from_port = 500
+  to_port = 500
+  protocol = "udp"
+  security_group_id = aws_security_group.worker-sg.id
+  source_security_group_id = aws_security_group.master-sg.id
+}
+
+resource "aws_security_group_rule" "ipsec-natt-workerself" {
+  type = "ingress"
+  description = "IPsec NAT-T packets"
+  from_port = 4500
+  to_port = 4500
+  protocol = "udp"
+  security_group_id = aws_security_group.worker-sg.id
+  self = true
+}
+
+resource "aws_security_group_rule" "ipsec-natt-worker" {
+  type = "ingress"
+  description = "IPsec NAT-T packets"
+  from_port = 4500
+  to_port = 4500
+  protocol = "udp"
+  security_group_id = aws_security_group.worker-sg.id
+  source_security_group_id = aws_security_group.master-sg.id
+}
+
+resource "aws_security_group_rule" "ipsec-isp-workerself" {
+  type = "ingress"
+  description = "IPsec ESP packets"
+  from_port = 0
+  to_port = 65535
+  protocol = 50
+  security_group_id = aws_security_group.worker-sg.id
+  self = true
+}
+
+resource "aws_security_group_rule" "ipsec-isp-worker" {
+  type = "ingress"
+  description = "IPsec ESP packets"
+  from_port = 0
+  to_port = 65535
+  protocol = 50
+  security_group_id = aws_security_group.worker-sg.id
+  source_security_group_id = aws_security_group.master-sg.id
 }
 
 resource "aws_security_group_rule" "internal-worker" {
