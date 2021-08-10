@@ -4,3 +4,4 @@
 Terraform/ocp-ssh*
 *.tfstate
 *.tfstate.backup
+.openshift_install.log

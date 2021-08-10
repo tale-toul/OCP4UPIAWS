@@ -370,29 +370,45 @@ resource "aws_iam_role_policy" "master-policy" {
     {
       "Effect": "Allow",
       "Action": [
-          "ec2:*"
+          "ec2:AttachVolume",
+          "ec2:AuthorizeSecurityGroupIngress",
+          "ec2:CreateSecurityGroup",
+          "ec2:CreateTags",
+          "ec2:CreateVolume",
+          "ec2:DeleteSecurityGroup",
+          "ec2:DeleteVolume",
+          "ec2:Describe*",
+          "ec2:DetachVolume",
+          "ec2:ModifyInstanceAttribute",
+          "ec2:ModifyVolume",
+          "ec2:RevokeSecurityGroupIngress",
+          "elasticloadbalancing:AddTags",
+          "elasticloadbalancing:AttachLoadBalancerToSubnets",
+          "elasticloadbalancing:ApplySecurityGroupsToLoadBalancer",
+          "elasticloadbalancing:CreateListener",
+          "elasticloadbalancing:CreateLoadBalancer",
+          "elasticloadbalancing:CreateLoadBalancerPolicy",
+          "elasticloadbalancing:CreateLoadBalancerListeners",
+          "elasticloadbalancing:CreateTargetGroup",
+          "elasticloadbalancing:ConfigureHealthCheck",
+          "elasticloadbalancing:DeleteListener",
+          "elasticloadbalancing:DeleteLoadBalancer",
+          "elasticloadbalancing:DeleteLoadBalancerListeners",
+          "elasticloadbalancing:DeleteTargetGroup",
+          "elasticloadbalancing:DeregisterInstancesFromLoadBalancer",
+          "elasticloadbalancing:DeregisterTargets",
+          "elasticloadbalancing:Describe*",
+          "elasticloadbalancing:DetachLoadBalancerFromSubnets",
+          "elasticloadbalancing:ModifyListener",
+          "elasticloadbalancing:ModifyLoadBalancerAttributes",
+          "elasticloadbalancing:ModifyTargetGroup",
+          "elasticloadbalancing:ModifyTargetGroupAttributes",
+          "elasticloadbalancing:RegisterInstancesWithLoadBalancer",
+          "elasticloadbalancing:RegisterTargets",
+          "elasticloadbalancing:SetLoadBalancerPoliciesForBackendServer",
+          "elasticloadbalancing:SetLoadBalancerPoliciesOfListener",
+          "kms:DescribeKey"
       ],
-      "Resource": "*"
-    },
-    {
-      "Effect": "Allow",
-      "Action": [
-          "elasticloadbalancing:*"
-        ],
-      "Resource":  "*" 
-    },
-    {
-      "Effect": "Allow",
-      "Action": [
-          "iam:PassRole"
-        ],
-      "Resource": "*"
-    },
-    {
-      "Effect": "Allow",
-      "Action": [
-          "s3:GetObject"
-        ],
       "Resource": "*"
     }
   ]
@@ -442,7 +458,8 @@ resource "aws_iam_role_policy" "worker-policy" {
     {
       "Effect": "Allow",
       "Action": [
-          "ec2:Describe*"
+          "ec2:DescribeInstances",
+          "ec2:DescribeRegions"   
       ],
       "Resource": "*"
     }
@@ -540,6 +557,26 @@ resource "aws_security_group_rule" "vxlan-master-self" {
   self = true
 }
 
+resource "aws_security_group_rule" "geneve-master" {
+  type = "ingress"
+  description = "Geneve packets"
+  from_port = 6081
+  to_port = 6081
+  protocol = "udp"
+  security_group_id = aws_security_group.master-sg.id
+  source_security_group_id = aws_security_group.worker-sg.id
+}
+
+resource "aws_security_group_rule" "geneve-master-self" {
+  type = "ingress"
+  description = "Geneve packets"
+  from_port = 6081
+  to_port = 6081
+  protocol = "udp"
+  security_group_id = aws_security_group.master-sg.id
+  self = true
+}
+
 resource "aws_security_group_rule" "internal-master" {
   type = "ingress"
   description = "Internal cluster communication"
@@ -556,6 +593,26 @@ resource "aws_security_group_rule" "internal-master-self" {
   from_port = 9000
   to_port = 9999
   protocol = "tcp"
+  security_group_id = aws_security_group.master-sg.id
+  self = true
+}
+
+resource "aws_security_group_rule" "internal-masterUDP" {
+  type = "ingress"
+  description = "Internal cluster communication UDP"
+  from_port = 9000
+  to_port = 9999
+  protocol = "udp"
+  security_group_id = aws_security_group.master-sg.id
+  source_security_group_id = aws_security_group.worker-sg.id
+}
+
+resource "aws_security_group_rule" "internal-master-selfUDP" {
+  type = "ingress"
+  description = "Internal cluster communication UDP"
+  from_port = 9000
+  to_port = 9999
+  protocol = "udp"
   security_group_id = aws_security_group.master-sg.id
   self = true
 }
@@ -596,6 +653,26 @@ resource "aws_security_group_rule" "services-master-self" {
   from_port = 30000
   to_port = 32767
   protocol = "tcp"
+  security_group_id = aws_security_group.master-sg.id
+  self = true
+}
+
+resource "aws_security_group_rule" "services-masterUDP" {
+  type = "ingress"
+  description = "Kubernetes ingress services UDP"
+  from_port = 30000
+  to_port = 32767
+  protocol = "udp"
+  security_group_id = aws_security_group.master-sg.id
+  source_security_group_id = aws_security_group.worker-sg.id
+}
+
+resource "aws_security_group_rule" "services-master-selfUDP" {
+  type = "ingress"
+  description = "Kubernetes ingress services UDP"
+  from_port = 30000
+  to_port = 32767
+  protocol = "udp"
   security_group_id = aws_security_group.master-sg.id
   self = true
 }
@@ -652,6 +729,26 @@ resource "aws_security_group_rule" "vxlan-worker-self" {
   self = true
 }
 
+resource "aws_security_group_rule" "geneve-worker" {
+  type = "ingress"
+  description = "Geneve packets"
+  from_port = 6081
+  to_port = 6081
+  protocol = "udp"
+  security_group_id = aws_security_group.worker-sg.id 
+  source_security_group_id = aws_security_group.master-sg.id
+}
+
+resource "aws_security_group_rule" "geneve-worker-self" {
+  type = "ingress"
+  description = "Geneve packets"
+  from_port = 6081
+  to_port = 6081
+  protocol = "udp"
+  security_group_id = aws_security_group.worker-sg.id
+  self = true
+}
+
 resource "aws_security_group_rule" "internal-worker" {
   type = "ingress"
   description = "Internal cluster communication"
@@ -668,6 +765,26 @@ resource "aws_security_group_rule" "internal-worker-self" {
   from_port = 9000
   to_port = 9999
   protocol = "tcp"
+  security_group_id = aws_security_group.worker-sg.id
+  self = true
+}
+
+resource "aws_security_group_rule" "internal-workerUDP" {
+  type = "ingress"
+  description = "Internal cluster communication UDP"
+  from_port = 9000
+  to_port = 9999
+  protocol = "udp"
+  security_group_id = aws_security_group.worker-sg.id
+  source_security_group_id = aws_security_group.master-sg.id
+}
+
+resource "aws_security_group_rule" "internal-worker-selfUDP" {
+  type = "ingress"
+  description = "Internal cluster communication UDP"
+  from_port = 9000
+  to_port = 9999
+  protocol = "udp"
   security_group_id = aws_security_group.worker-sg.id
   self = true
 }
@@ -708,6 +825,26 @@ resource "aws_security_group_rule" "services-worker-self" {
   from_port = 30000
   to_port = 32767
   protocol = "tcp"
+  security_group_id = aws_security_group.worker-sg.id
+  self = true
+}
+
+resource "aws_security_group_rule" "services-workerUDP" {
+  type = "ingress"
+  description = "Kubernetes ingress services UDP"
+  from_port = 30000
+  to_port = 32767
+  protocol = "udp"
+  security_group_id = aws_security_group.worker-sg.id
+  source_security_group_id = aws_security_group.master-sg.id
+}
+
+resource "aws_security_group_rule" "services-worker-selfUDP" {
+  type = "ingress"
+  description = "Kubernetes ingress services UDP"
+  from_port = 30000
+  to_port = 32767
+  protocol = "udp"
   security_group_id = aws_security_group.worker-sg.id
   self = true
 }
