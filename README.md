@@ -20,7 +20,7 @@
 
 This project contains the necesary instructions to deploy an Openshift 4 public cluster on AWS using the UPI installation method.
 
-The procedura has been tested on Openshift 4.7, in particular in 4.7.23
+The procedura has been tested on Openshift 4.8, in particular in 4.8.3
 
 ## Requirements
 
@@ -265,8 +265,8 @@ Terraform has been successfully initialized!
    Terraform analizes the information provided and asks for confirmation before proceding with the actual creation of resources:
    ```
    ...
-   Plan: 107 to add, 0 to change, 0 to destroy.
-   
+   Plan: 131 to add, 0 to change, 0 to destroy.
+   ...
    Do you want to perform these actions?
      Terraform will perform the actions described above.
      Only 'yes' will be accepted to approve.
