@@ -167,7 +167,7 @@ $ cp upi-ssh* ~/.ssh
    $ touch Terraform/clover.vars
    ```
 
-1. Get the value for the public zone id from the file **clover/manifests/cluster-dns-02-config.yml** and add an entry to the variable assigment file created before for the variable **dns_domain**. Check that the base DNS domain (baseDomain) is the one selected to create the cluster public DNS names:
+1. Get the value for the public zone id from the file **clover/manifests/cluster-dns-02-config.yml** and add an entry to the variable assigment file created before for the variable **dns_domain_ID**. Check that the base DNS domain (baseDomain) is the one selected to create the cluster public DNS names:
 
    ```yaml
    spec:
