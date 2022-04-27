@@ -57,7 +57,7 @@ The procedura has been tested on Openshift 4.8, in particular in 4.8.3
 
 ## Installation instructions
 
-The installation steps follow the instructions provided at [Installing a cluster on user-provisioned infrastructure in AWS by using CloudFormation templates:](https://docs.openshift.com/container-platform/4.4/installing/installing_aws/installing-aws-user-infra.html), but instead of CloudFormation, Terraform is used to create the resources in AWS.
+The installation steps follow the instructions provided at [Installing a cluster on user-provisioned infrastructure in AWS by using CloudFormation templates:](https://docs.openshift.com/container-platform/4.9/installing/installing_aws/installing-aws-user-infra.html), but instead of CloudFormation, Terraform is used to create the resources in AWS.
 
 1. [Download the installation program, pull secret and command line tools](https://cloud.redhat.com/openshift/install).- Select AWS as the infrastructure provider, then User-provided infrastructure. Download the installer and command line tools for operating system required.  Download the pull secret as a file for later use.  
 

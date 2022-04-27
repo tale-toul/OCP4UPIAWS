@@ -2,6 +2,11 @@
 *.vimrc
 .terraform
 Terraform/ocp-ssh*
+Terraform/.terraform.lock.hcl
 *.tfstate
 *.tfstate.backup
 .openshift_install.log
+oc
+kubectl
+openshift-install
+pull-secret
