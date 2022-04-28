@@ -68,11 +68,11 @@ The installation steps follow the instructions provided at [Installing a cluster
    $ sudo tar xvf openshift-client-linux.tar.gz  -C /usr/local/bin/
    ```
 
-1. [Create an ssh key pair](https://docs.openshift.com/container-platform/4.4/installing/installing_aws/installing-aws-user-infra.html#ssh-agent-using_installing-aws-user-infra).- This key will be installed on the bootstrap and every instance in the cluster and will allow pawordless connections to those machines.  This step is not extrictly required for twu reason: 
+1. [Create an ssh key pair](https://docs.openshift.com/container-platform/4.4/installing/installing_aws/installing-aws-user-infra.html#ssh-agent-using_installing-aws-user-infra).- This key will be installed on the bootstrap host and every instance in the cluster, and will allow passwordless connections to those machines.  
 
-   1. ssh connections to the cluster instances are not required, quite the contrary they are discourage, but it is a convenient tool in case issues come up during cluster installation.
+     This step is not extrictly required because ssh connections to the cluster nodes are not required, quite the contrary they are discourage, but it is a convenient tool in case issues come up during cluster installation.
 
-   1. An already existinig ssh key pair can be used, as long as it is present in the direcotry ~/.ssh
+     An already existinig ssh key pair can be used, as long as it is present in the direcotry ~/.ssh
 
 ```shell
  $ ssh-keygen -o -t rsa -f upi-ssh -N "" -b 4096
@@ -88,7 +88,7 @@ $ cp upi-ssh* ~/.ssh
 
 1. [Create the **install-config.yaml** file](https://docs.openshift.com/container-platform/4.4/installing/installing_aws/installing-aws-user-infra.html#installation-generate-aws-user-infra-install-config_installing-aws-user-infra).- This is the configuration file that describes the cluster. The easiest way to create the file is by using the openshift install program with the options **"create install-config"** and answer the questions asked.  
 
-   The option **--dir** is followed by a directory name, the terraform manifests expect the name of the directory and the name of the cluster to be the same, otherwise the creation of the AWS resources will fail.  It is best to use an empty directory or a non existing one to avoid conflic with any previous installation, if the directory does not exist the installation program will create it:
+   The option **--dir** is followed by a directory name, the terraform manifests expect the name of the directory and the name of the cluster to be the same, otherwise the creation of the AWS resources will fail.  It is best to use an empty directory or a non existing one to avoid conflicting with any previous installation, if the directory does not exist the installation program will create it:
 
    The command will ask:
 
@@ -100,7 +100,7 @@ $ cp upi-ssh* ~/.ssh
    * A name for the cluster, used as the base for naming the resources, and will be added to the above DNS domain
    * The pull secret to download container images from Red Hat.  Paste the contents of the pull-secret file downloaded before.
    
-   ```shell
+   ```
     $ ./openshift-install create install-config --dir clover
    ? SSH Public Key /home/jjerezro/.ssh/upi-ssh.pub
    ? Platform aws
@@ -137,7 +137,7 @@ $ cp upi-ssh* ~/.ssh
          Planet: Earth
    ```
 
-1. Backup the **install-config.yaml** file outside of the clover directory, because the file will be destroyed in the next step.
+1. Backup the **install-config.yaml** file outside of the clover directory, because the file will be consumed and destroyed in the next step.
 
 1. Create the Kubernetes manifests for the cluster
 
@@ -155,7 +155,7 @@ $ cp upi-ssh* ~/.ssh
    spec:
      mastersSchedulable: false
    ```
-1. Remove the Kubernetes manifest files that define the control plane and worker machines as machines and machinesets objects respectively.  These definitions need to be deleted because when masters and workers are added to the cluster the machineset-api cluster operator is not available.
+1. Remove the Kubernetes manifest files that define the control plane and worker hosts as machines and machinesets objects respectively.  These definitions need to be deleted because when masters and workers are added to the cluster the machineset-api cluster operator is not available.
 
    ```shell
    $ rm -v clover/openshift/99_openshift-cluster-api_master-machines-*.yaml
@@ -228,9 +228,9 @@ Terraform has been successfully initialized!
    dns_domain_ID="Z00659431CO1O47AE0285"
    infra_name = "clover-v5fgv"
    ```
-1. Get the encoded certificate authority to be used by the master instances.  This is the long string located in the master ignition file **master.ign** and looks like this:
+1. Get the encoded certificate authority to be used by the master instances.  This is the long string located in the master ignition file **clover/master.ign** and looks like this:
 
-   `data:text/plain;charset=utf-8;base64,LS0tLS1CRUdJTiBDRVJUSUZJQ0<...long string of characters..>==`
+   `data:text/plain;charset=utf-8;base64,LS0tLS1CRUdJTiBDRVJUSUZJQ0<..long string of characters..>==`
 
    This long string must be assigned to the variable **master_ign_CA** in the variables assigment file created before:
 
@@ -240,7 +240,7 @@ Terraform has been successfully initialized!
    infra_name = "clover-v5fgv"
    master_ign_CA = "data:text/plain;charset=utf-8;base64,LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0t........LS0tCk1JSS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg=="
    ```
-1. Review the rest of the variables in the file input-vars.tf, in particular the region and cluster name must be the same that were used when creating the install-config.yaml file, and add any required variable definition to the variables assigment file: 
+1. Review the rest of the variables in the file input-vars.tf, in particular the **region_name** must be the same that was used when creating the install-config.yaml file. Add any variable definition to the variables assigment file: 
 
    ```shell
     $ cat Terraform/clover.vars
@@ -273,7 +273,7 @@ Terraform has been successfully initialized!
    
      Enter a value:
    ```
-   It will take a few minutes for Terraform to create all resources.  The resources will show up in the AWS web console as they are being created.
+   It will take a few minutes for Terraform to create all resources.  The resources will come up in the AWS web console as they are being created.
 
 ### Openshift install completion
 
@@ -315,8 +315,8 @@ If you get an error, wait a few minutes and try again
 On a new window run the following command to check on the completion of the installation.  This command is not strictly required, is just shows information about the installation process:
 
 ```shell
-$ ./openshift-install wait-for install-complete --dir brinx/ --log-level info
-INFO Waiting up to 30m0s for the cluster at https://api.brinx.tale.rhcee.support:6443 to initialize...
+./openshift-install --dir clover/ wait-for install-complete --log-level info
+INFO Waiting up to 40m0s (until 11:00AM) for the cluster at https://api.clover.jjerezro.emeatam.support:6443 to initialize...
 ```
 
 Get the list of nodes, at this stage only master nodes should be available:
@@ -429,9 +429,9 @@ The bootstrap resources can be deleted.
 
 ## Deleting bootstrap resources
 
-The boostrap EC2 instance and related resources were created by Terraform as an independent module.  This allows for the deletion of these without afecting  the rest of the resources.
+The boostrap EC2 instance and related resources are created by Terraform as an independent module.  This allows for the deletion of these resources without afecting the rest of the Openshift cluster.
 
-The command requires the use of the option `-target module.bootstrap` so terraform knows that only bootstrap reources must be deleted.  
+The command requires the use of the option `-target module.bootstrap` to inform terraform that only bootstrap reources must be deleted.  
 
 **WARNING** If the target option is not used, terraform will delete all resources, resulting in the destruction of the cluster.
 
@@ -444,10 +444,14 @@ This command will show the following warning message that can be safely ignored:
 ```
 Warning: Resource targeting is in effect
 ```
+After terraform destroys the bootstrap module resources another warning message is shown, again this message can be ignored:
+```
+Warning: Applied changes may be incomplete
+```
 
 ## Deleting the cluster
 
-Part of the cluster resources were created using terraform, and part were created by Openshift afterward.  To make sure all resources are deleted, both the openshift installer and terraform are used.  
+Part of the cluster resources were created by terraform, and part were created by the Openshift installer afterwards.  To make sure all resources are deleted, both the openshift installer and terraform are used.  
 
 Two terminals are requied to follow this procedure:
 

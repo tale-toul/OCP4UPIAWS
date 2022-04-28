@@ -8,7 +8,7 @@ variable "region_name" {
 #infra_name has no default value, see README.md to know how to get its value
 variable "infra_name" {
   type = string
-  description = "Unique string based on the cluster_name used to create the names of other some components" 
+  description = "Unique string based on the cluster_name used to create the names of other components" 
 }
 
 variable "subnet_count" {
