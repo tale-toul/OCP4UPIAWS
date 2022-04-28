@@ -20,7 +20,22 @@
 
 This project contains the necesary instructions to deploy an Openshift 4 public cluster on AWS using the UPI installation method.
 
-The procedura has been tested on Openshift 4.8, in particular in 4.8.3
+These instructions have been tested on Openshift versions from 4.5 to 4.10
+
+Checkout the appropriate tag for the Openshift version that is to be deployed.
+```
+git tag
+4.10
+4.5
+4.6
+4.7
+4.8
+4.9
+```
+For example to deploy an Openshift 4.8 cluter:
+```
+git checkout 4.8
+```
 
 ## Requirements
 
