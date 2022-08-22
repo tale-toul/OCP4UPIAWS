@@ -1,4 +1,13 @@
 #PROVIDERS
+terraform {
+  required_providers {
+    aws = {
+      source = "hashicorp/aws"
+      version = "2.69.0"
+    }
+  }
+}
+
 provider "aws" {
   region = var.region_name
   shared_credentials_file = "aws-credentials.ini"
