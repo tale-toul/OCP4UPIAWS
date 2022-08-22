@@ -95,7 +95,7 @@ private_subnet_count = var.subnet_count > 0 && var.subnet_count <= 3 ? var.subne
 public_subnet_count = var.enable_proxy ? 1 : local.private_subnet_count
 
 #Domain name without the dot at the end
-dotless_domain = replace("${data.aws_route53_zone.domain.name}","/.$/","")
+dotless_domain = replace("${data.aws_route53_zone.domain.name}","/\\.$/","")
 
 #Cluster name derived from infra_name
 #The regular expression contains two parantheses groups, so it will return a list with two values.  The first value contains the cluster name, that is why the index [0] is assigned to the variable.

@@ -164,16 +164,18 @@ resource "aws_lb_target_group_attachment" "bootstrap-external-service-attach" {
 #S3 disk to store the bootstrap ignition config file
 resource "aws_s3_bucket" "ignition-bucket" {
   bucket = "${var.infra_name }-ignition"
-  region = var.region_name
   force_destroy = true
-
-  acl    = "private"
 
   tags = {
     Name  = "${var.infra_name }-ignition"
     Clusterid = var.cluster_name
     "kubernetes.io/cluster/${var.infra_name}" = "shared"
   }
+}
+
+resource "aws_s3_bucket_acl" "ignition-bucket-acl" {
+  bucket = aws_s3_bucket.ignition-bucket.id
+  acl    = "private"
 }
 
 #Copy bootstrap ignition file to the above bucket

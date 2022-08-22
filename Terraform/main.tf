@@ -1,7 +1,6 @@
 #PROVIDERS
 provider "aws" {
   region = var.region_name
-  shared_credentials_file = "aws-credentials.ini"
 }
 
 #BOOTSTRAP 
@@ -1195,4 +1194,8 @@ output "private_subnet_cidr_block" {
 output "enable_proxy" {
   value = var.enable_proxy
   description = "Is the proxy enabled or not?"
+}
+output "dotless_domain" {
+  value = local.dotless_domain
+  description = "The route53 DNS domain without a dot at the end"
 }

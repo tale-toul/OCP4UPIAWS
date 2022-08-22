@@ -7,7 +7,7 @@
 * [Installation instructions](#installation-instructions)
   * [Ignition files creation](#ignition-files-creation)
   * [Terraform initialization](#terraform-initialization)
-  * [Creating the infrastructure](#creating-the-infrastructure)
+  * [Creating the infrastructure on AWS](#creating-the-infrastructure-on-aws)
   * [Openshift install completion](#openshift-install-completion)
 * [Deleting bootstrap resources](#deleting-bootstrap-resources)
 * [Deleting the cluster](#deleting-the-cluster)
@@ -39,53 +39,38 @@ git checkout 4.8
 
 ## Requirements
 
-* An [AWS account](https://aws.amazon.com) with sufficient privileges to create the resources required by Openshift.
+* An [AWS account](https://aws.amazon.com) with sufficient privileges to create the resources required by Openshift.  The account credentials are requested by the openshift installer, and terraform expects them in the default file **$HOME/.aws/credentials** or in the environment variables **AWS_ACCESS_KEY_ID**, **AWS_SECRET_ACCESS_KEY**, see [terraform documentation](https://registry.terraform.io/providers/hashicorp/aws/latest/docs#environment-variables)
 
-* A public DNS domain managed by AWS, to publish the cluster on.  There is a convenient module to create a DNS subdomain in the directory  **ExternalDNSHostedZone**.  If the cluster is private this DNS domain is not required but at the moment this project will not create a private cluster.
+* A public DNS domain, managed by AWS, to publish the cluster on.  The AWS account provided to the Openshift installer must be able to create records in that zone.  There is a convenient module to create a DNS subdomain in the directory  **ExternalDNSHostedZone**.  If the cluster is private this DNS domain is not required, but at the moment this project will not create a private cluster.
 
-* A [Red Hat account](https://cloud.redhat.com) 
+* A [Red Hat account](https://access.redhat.com).  At least a free Red Hat account is required to download the Openshift installer components.
 
-* At least 500MB of disk space in the machine where the installation is run from
+* At least 500MB of disk space in the host where the installation is run from
 
-* [Terraform](https://www.terraform.io/) must be installed in the local machine.
-  The installation of terraform is as simple as downloading a zip compiled binary package for your operating system and architecture from:
+* [Terraform](https://www.terraform.io/) must be installed in the local host.
+  The terraform installation is straight forward, just follow the instructions for your operating system in the [terraform site](https://www.terraform.io/downloads.html)
   
-  [https://www.terraform.io/downloads.html](https://www.terraform.io/downloads.html)
-  
-  Then unzip the file:
-  
-  ```shell
-  # unzip terraform_0.11.8_linux_amd64.zip 
-  Archive:  terraform_0.11.8_linux_amd64.zip
-  inflating: terraform
-  ```
-  Place the binary somewhere in your path:
-  
-  ```shell
-  # cp terraform /usr/local/bin
-  ```
-  Check that it is working:
-  
-  ```shell
-  # terraform --version
-  ```
-
 ## Installation instructions
 
-The installation steps follow the instructions provided at [Installing a cluster on user-provisioned infrastructure in AWS by using CloudFormation templates:](https://docs.openshift.com/container-platform/4.9/installing/installing_aws/installing-aws-user-infra.html), but instead of CloudFormation, Terraform is used to create the resources in AWS.
+These installation steps follow the instructions provided at [the official Red Hat documentation](https://docs.openshift.com/container-platform/4.10/installing/installing_aws/installing-aws-user-infra.html), but in this case Terraform is used to create the resources in AWS instead of CloudFormation.
+1. Clone this github repository.  All other files and directories must be downloaded and created inside the repository's directory.
+   ```
+   git clone https://github.com/tale-toul/OCP4UPIAWS
+   ```
+1. [Download the installation program, pull secret and command line tools](https://cloud.redhat.com/openshift/install).- In section **Run it yourself**, select AWS as the cloud provider, then User-provided infrastructure.  Download the installer and command line tools for operating system required.  Download the pull secret as a file for later use.  
 
-1. [Download the installation program, pull secret and command line tools](https://cloud.redhat.com/openshift/install).- Select AWS as the infrastructure provider, then User-provided infrastructure. Download the installer and command line tools for operating system required.  Download the pull secret as a file for later use.  
+   The link above contains the latest version of the Openshift components, for earlier versions use [this link](https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/) and click on the desired version.  The pull secret must be obtained from the first link.
 
-   Uncompress the intall program and cli tools:
+   Uncompress the intall program and cli tools.  Do this in the repository's local directory created when it was cloned:
 
    ```shell
-   $ tar xvf openshift-install-linux.tar.gz
-   $ sudo tar xvf openshift-client-linux.tar.gz  -C /usr/local/bin/
+   tar xvf openshift-install-linux.tar.gz
+   sudo tar xvf openshift-client-linux.tar.gz  -C /usr/local/bin/
    ```
 
-1. [Create an ssh key pair](https://docs.openshift.com/container-platform/4.4/installing/installing_aws/installing-aws-user-infra.html#ssh-agent-using_installing-aws-user-infra).- This key will be installed on the bootstrap host and every instance in the cluster, and will allow passwordless connections to those machines.  
+1. [Create an ssh key pair](https://docs.openshift.com/container-platform/4.4/installing/installing_aws/installing-aws-user-infra.html#ssh-agent-using_installing-aws-user-infra).- This key will be installed in the bootstrap host and every node in the cluster, and will allow passwordless connections to those machines.  
 
-     This step is not extrictly required because ssh connections to the cluster nodes are not required, quite the contrary they are discourage, but it is a convenient tool in case issues come up during cluster installation.
+     This step is not extrictly required because ssh connections to the cluster nodes are not recommended, but it is still a convenient tool in case any issues come up during cluster installation.
 
      An already existinig ssh key pair can be used, as long as it is present in the direcotry ~/.ssh
 
@@ -105,11 +90,11 @@ $ cp upi-ssh* ~/.ssh
 
    The option **--dir** is followed by a directory name, the terraform manifests expect the name of the directory and the name of the cluster to be the same, otherwise the creation of the AWS resources will fail.  It is best to use an empty directory or a non existing one to avoid conflicting with any previous installation, if the directory does not exist the installation program will create it:
 
-   The command will ask:
+   The command asks for:
 
-   * The ssh keys that will be installed in the EC2 instances. Selected from those already in ~/.ssh
+   * The ssh keys to be installed in the EC2 instances. Selected from those already in ~/.ssh
    * The platform provider, AWS in this case
-   * The credentials of the AWS account to use to deploy the resources.  If the file ~/.aws/credentials exists and contains valid credentials, these will be used.
+   * The credentials of the AWS account to use to deploy the resources.  If the file **~/.aws/credentials** exists and contains valid credentials, these will be used and this question is skipped.
    * The AWS region where the cluster will be deployed
    * The base DNS domain to use for the cluster public URLs.  This domain must already exist and be managed by AWS.
    * A name for the cluster, used as the base for naming the resources, and will be added to the above DNS domain
@@ -132,18 +117,11 @@ $ cp upi-ssh* ~/.ssh
    ? Cluster Name clover
    ? Pull Secret [? for help] **************************************************************
    ```
-   The previous command will create the directory _clover_, if it does not already exist, and the file **install-config.yaml** inside it.
+   The previous command will create the directory _clover_, if it does not already exist, and create the file **install-config.yaml** inside it.
 
-1. Edit the **install-config.yaml** file and set the number of compute (worker) replicas to 0.  Make any other [changes](https://docs.openshift.com/container-platform/4.4/installing/installing_aws/installing-aws-customizations.html#installation-configuration-parameters_installing-aws-customizations) required for the installation, in the example bellow, user defined tags have been added:
+1. Make any [changes](https://docs.openshift.com/container-platform/4.4/installing/installing_aws/installing-aws-customizations.html#installation-configuration-parameters_installing-aws-customizations) to the install-config.yaml required for the installation, in the example bellow, user defined tags have been added:
 
    ```yaml
-   compute:
-   - architecture: amd64
-     hyperthreading: Enabled
-     name: worker
-     platform: {}
-     replicas: 0
-   ...
    platform:
      aws:
        region: eu-west-3
@@ -152,37 +130,32 @@ $ cp upi-ssh* ~/.ssh
          Planet: Earth
    ```
 
-1. Backup the **install-config.yaml** file outside of the clover directory, because the file will be consumed and destroyed in the next step.
+1. Backup the **install-config.yaml** file outside of the clover directory; the file will be consumed and destroyed in the next step.
 
 1. Create the Kubernetes manifests for the cluster
 
    ```shell
-    $ ./openshift-install create manifests --dir clover
-   INFO Credentials loaded from the "default" profile in file "/home/jjerezro/.aws/credentials" 
+   ./openshift-install create manifests --dir clover
+   INFO Credentials loaded from the "default" profile in file "/home/user/.aws/credentials" 
    INFO Consuming Install Config from target directory 
-   WARNING Making control-plane schedulable by setting MastersSchedulable to true for Scheduler cluster settings
+   INFO Manifests created in: daya/manifests and daya/openshift
    ```
-   The warning message will be dealt with in the next step.
 
-1. Edit the file **clover/manifests/cluster-scheduler-02-config.yml**  and set the parameter **mastersSchedulable** to _false_ to prevent pods from being scheduled on the master nodes:
+1. Remove the Kubernetes manifest files that define the control plane machines. This prevents the installer from creating the control plane (master) nodes.  These machines will be created later by terraform.
 
-   ```yaml
-   spec:
-     mastersSchedulable: false
    ```
-1. Remove the Kubernetes manifest files that define the control plane and worker hosts as machines and machinesets objects respectively.  These definitions need to be deleted because when masters and workers are added to the cluster the machineset-api cluster operator is not available.
-
-   ```shell
-   $ rm -v clover/openshift/99_openshift-cluster-api_master-machines-*.yaml
-   $ rm -v clover/openshift/99_openshift-cluster-api_worker-machineset-*.yaml
+   rm -fv clover/openshift/99_openshift-cluster-api_master-machines-*.yaml
+   ```
+1. Remove the Kubernetes manifest files that define the worker machines.  This prevents the installer to create the compute nodes.  These machines will be created later by terraform.
+   ```
+   rm -fv clover/openshift/99_openshift-cluster-api_worker-machineset-*
    ```
 1. Create an empty file in the Terraform directory to store the variable assigments that will later be used by the terraform command to create the infraestructure.  The file does not need to have a specific name or extension, but if the extension is **.tfvars** it will be automatically loaded by terraform:
 
    ```shell
-   $ touch Terraform/clover.vars
+   touch Terraform/clover.vars
    ```
-
-1. Get the value for the public zone id from the file **clover/manifests/cluster-dns-02-config.yml** and add an entry to the variable assigment file created before for the variable **dns_domain_ID**. Check that the base DNS domain (baseDomain) is the one selected to create the cluster public DNS names:
+1. Get the value for the public zone id from the file **clover/manifests/cluster-dns-02-config.yml** and add an entry to the variable assigment file created before for the variable **dns_domain_ID**. Check that the base DNS domain (baseDomain) matches the one selected during install-config.yaml creation:
 
    ```yaml
    spec:
@@ -203,12 +176,13 @@ $ cp upi-ssh* ~/.ssh
 1. Create the ignition files.  This process will remove the manifest files:
 
    ```shell
-   $ ./openshift-install create ignition-configs --dir clover
-   INFO Consuming OpenShift Install (Manifests) from target directory 
-   INFO Consuming Master Machines from target directory 
-   INFO Consuming Worker Machines from target directory 
+   ./openshift-install create ignition-configs --dir clover
    INFO Consuming Openshift Manifests from target directory 
-   INFO Consuming Common Manifests from target directory
+   INFO Consuming Worker Machines from target directory 
+   INFO Consuming Common Manifests from target directory 
+   INFO Consuming Master Machines from target directory 
+   INFO Consuming OpenShift Install (Manifests) from target directory 
+   INFO Ignition-Configs created in: clover and clover/auth
    ```
 
 ### Terraform initialization
@@ -218,12 +192,18 @@ Terraform is used to create the infrastructure components of the VPC, some of th
 Before running terraform for the first time it needs to be initialized, run the following command in the directory where the terraform manifest files are located:
 
 ```shell
- # terraform init
+cd Terraform
+terraform init
+
+Initializing modules...
+- bootstrap in Boostrap
+
 Initializing the backend...
 
 Initializing provider plugins...
-- Checking for available provider plugins...
-- Downloading plugin for provider "aws" (hashicorp/aws) 2.69.0...
+- Finding latest version of hashicorp/aws...
+- Installing hashicorp/aws v4.27.0...
+- Installed hashicorp/aws v4.27.0 (signed by HashiCorp)
 
 Terraform has been successfully initialized!
 ```
@@ -233,13 +213,13 @@ Terraform has been successfully initialized!
 1. Get the infrastructure name assigned by the installer, this consists of the clustername followed by a short random string.  This name will be used later as the base of other infrastructure component names: 
 
    ```shell
-   $ cat clover/metadata.json |jq -r .infraID
+    cat clover/metadata.json |jq -r .infraID
    clover-ltwcq
    ```
 1. Add an entry to the variable assigment file created before for the variable **infra_name**:
 
    ```shell
-    $ cat Terraform/clover.vars
+    cat Terraform/clover.vars
    dns_domain_ID="Z00659431CO1O47AE0285"
    infra_name = "clover-v5fgv"
    ```
@@ -250,7 +230,7 @@ Terraform has been successfully initialized!
    This long string must be assigned to the variable **master_ign_CA** in the variables assigment file created before:
 
    ```shell
-    $ cat Terraform/clover.vars
+    cat Terraform/clover.vars
    dns_domain_ID="Z00659431CO1O47AE0285"
    infra_name = "clover-v5fgv"
    master_ign_CA = "data:text/plain;charset=utf-8;base64,LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0t........LS0tCk1JSS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg=="
@@ -258,17 +238,18 @@ Terraform has been successfully initialized!
 1. Review the rest of the variables in the file input-vars.tf, in particular the **region_name** must be the same that was used when creating the install-config.yaml file. Add any variable definition to the variables assigment file: 
 
    ```shell
-    $ cat Terraform/clover.vars
+    cat Terraform/clover.vars
    dns_domain_ID="Z00659431CO1O47AE0285"
    infra_name = "clover-v5fgv"
    master_ign_CA = "data:text/plain;charset=utf-8;base64,LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0t........LS0tCk1JSS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg=="
    region_name = "eu-west-3"
    ```
+1. Make sure the asw account credentials are defined in the file $HOME/.aws/credentials or in the environment variables **AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY** as explained in [terraform documentation](https://registry.terraform.io/providers/hashicorp/aws/latest/docs#shared-configuration-and-credentials-files)
 1. Go to the Terraform directory and run a command like the following:
 
    ```shell
-    $ cd Terraform 
-    $ terraform apply -var-file clover.vars
+     cd Terraform 
+     terraform apply -var-file clover.vars
    ```
    Alternatively the variables can be assigned in the command line:
    
@@ -290,17 +271,19 @@ Terraform has been successfully initialized!
    ```
    It will take a few minutes for Terraform to create all resources.  The resources will come up in the AWS web console as they are being created.
 
+   When all resources are created, in particular the bootstrap and control plane machines, the Openshift installation process starts automatically without the need from the user to do any additional step.
+
 ### Openshift install completion
 
 On another terminal run the following command to see how the installation is progressing, and wait for the message saying it is safe to remove the bootstrap resources.
 ```shell
-$ ./openshift-install wait-for bootstrap-complete --dir brinx/ --log-level info
-INFO Waiting up to 20m0s for the Kubernetes API at https://api.brinx.tale.rhcee.support:6443... 
+$ ./openshift-install wait-for bootstrap-complete --dir clover/ --log-level info
+INFO Waiting up to 20m0s for the Kubernetes API at https://api.clover.tale.rhcee.support:6443... 
 INFO API v1.17.1+166b070 up                       
 INFO Waiting up to 40m0s for bootstrapping to complete... 
 INFO It is now safe to remove the bootstrap resources
 ```
-The log file for the installation may be usefull in case of failure, it is located at **clover/.openshift_install.log**
+The log file for the installation may be useful in case of failure, it is located at **clover/.openshift_install.log**
 
 Another way to peek into the installation process is to ssh into the bootstrap instance and run the journalct command:
 
@@ -311,12 +294,12 @@ bootstrap $ journalctl -b -f
 
 When the bootstrap process has completed successfully with the message: `INFO It is now safe to remove the bootstrap resources`.  The master nodes still need a few minutes to be ready.
 
-Despite the message keep the bootstrap resources around until the end of the intallation, they are usefull for troubleshooting in case anything goes wrong.  Check the section [Deleting bootstrap resources](#deleting-bootstrap-resources) for instructions on how to remove those resources.
+Despite the message keep the bootstrap resources around until the end of the intallation, they are useful for troubleshooting in case anything goes wrong.  Check the section [Deleting bootstrap resources](#deleting-bootstrap-resources) for instructions on how to remove those resources.
 
 Login to the cluster using the CLI by exporting the variable KUBECONFIG using the path to the file **kubeconfig** created by the openshift-install program.  Using a relative path like in the following example will require to run the oc commands ffrom the same directory where the relative path is valid:
 
 ```shell
-export KUBECONFIG=brinx/auth/kubeconfig
+export KUBECONFIG=clover/auth/kubeconfig
 ```
 
 Run a test command to check is the cluster is ready:
@@ -430,12 +413,12 @@ storage                                    4.4.11    True        False         F
 When all cluster operator are ready, the openshift-install command that had been run previously in another window should also finish successfully:
 
 ```shell
-$ ./openshift-install wait-for install-complete --dir brinx/ --log-level info
-INFO Waiting up to 30m0s for the cluster at https://api.brinx.tale.rhcee.support:6443 to initialize... 
+$ ./openshift-install wait-for install-complete --dir clover/ --log-level info
+INFO Waiting up to 30m0s for the cluster at https://api.clover.tale.rhcee.support:6443 to initialize... 
 INFO Waiting up to 10m0s for the openshift-console route to be created... 
 INFO Install complete!                            
-INFO To access the cluster as the system:admin user when using 'oc', run 'export KUBECONFIG=/home/brinx/auth/kubeconfig' 
-INFO Access the OpenShift web-console here: https://console-openshift-console.apps.brinx.example.com
+INFO To access the cluster as the system:admin user when using 'oc', run 'export KUBECONFIG=/home/clover/auth/kubeconfig' 
+INFO Access the OpenShift web-console here: https://console-openshift-console.apps.clover.example.com
 INFO Login to the console with user: kubeadmin, password: amDqg-bjVCH-TLBfQ-zdJnu
 ```
 The cluster is now installed and ready to be used.
@@ -473,11 +456,11 @@ Two terminals are requied to follow this procedure:
 In one terminal run the following openshift-intall command, this will trigger the removal of part of the resources:
 
 ```shell
-$ ./openshift-install destroy cluster --dir brinx --log-level info
+./openshift-install destroy cluster --dir clover --log-level info
 ```
-Leave the above command running for a few minutes, at some point it will get stuck and will not go any further.  At that moment run the terraform destroy command in another terminal.
+Leave the above command running for a few minutes, if at some point it gets stuck and doesn't go any further, run the terraform destroy command in another terminal.
 ```shell
-$ terraform destroy -var-file clover.vars
+terraform destroy -var-file clover.vars
 ```
 The above command will unlock the first command on the other terminal.  Finally all resources will get deleted.
 
