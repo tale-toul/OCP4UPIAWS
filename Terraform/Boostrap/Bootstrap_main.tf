@@ -179,7 +179,7 @@ resource "aws_s3_bucket_acl" "ignition-bucket-acl" {
 }
 
 #Copy bootstrap ignition file to the above bucket
-resource "aws_s3_bucket_object" "bootstrap-ignition-file" {
+resource "aws_s3_object" "bootstrap-ignition-file" {
   bucket = aws_s3_bucket.ignition-bucket.id
   key = "bootstrap.ign"
   source = "${path.root}/../${var.cluster_name}/bootstrap.ign"
