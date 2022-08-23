@@ -10,3 +10,4 @@ oc
 kubectl
 openshift-install
 pull-secret
+install-config.yaml
